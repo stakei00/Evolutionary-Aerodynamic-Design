@@ -1,6 +1,6 @@
 class Airfoil:
 
-    def __init__(self) -> None:
+    def __init__(self, ) -> None:
         """
         Initializes airfoil object 
         """
@@ -13,3 +13,5 @@ class Airfoil:
         """
         Analysis of airfoil in XFOIL. Adds results to object attributes
         """
+        from xfoil import XFoil 
+        xf = XFoil() #instance of XFOIL class 
