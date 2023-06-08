@@ -8,51 +8,51 @@ return a generic score based on multiple desirable traits each with scoring
 weights. (the sky's the limit)
 """
 
-#get reynolds number at design flight conditions (based on L_ref = 1)
+#get reynolds number to chord ratio at design flight conditions
 altitude_ft = 1000
 true_airspeed_ft_s = 80
 Re = evo.get_reynolds_number(altitude_ft, true_airspeed_ft_s, units="US")
 
 wing_parameters = {
     #defines the fixed and varying parameters. varying parameters must be 
-    # specified as list 
-    "span":                     5, 
-    "aspect ratio":             12,
-    "taper":                    [0.2, 1],
-    "sweep deg":                0,
-    "twist deg":                [-10, 5],
-    "root camber":              [0, 0.08],
-    "root camber location":     [0.2, 0.6],
-    "root thickness":           [0.04, 0.3],
+    # specified as 2-element lists 
+    "span":                     5,              #full wing span 
+    "aspect ratio":             12,             #full aspect ratio
+    "taper":                    [0.2, 1],       #taper ratio 
+    "sweep deg":                10,             #wing sweep at qua
+    "twist deg":                [-10, 5],       #wing tip incidenc
+    "root camber":              [0, 0.08],      #NACA X...
+    "root camber location":     [0.2, 0.6],     #NACA .X..
+    "root thickness":           [0.04, 0.3],    #NACA ..XX
     "tip camber":               [0, 0.08],
     "tip camber location":      [0.2, 0.6],
     "tip thickness":            [0.04, 0.3],
-    "reynolds number":          Re
-}
+    "reynolds number":          Re              #reynolds # to chord ratio (be aware of this)
+}  
 
 study_parameters = {
     #defines genetic algorithm study settings
-    "population size":              6,
-    "children per generation":      3, 
-    "gene mutation probability":    0.125,
-    "child mutation probability":   1,
-    "number of gens":               5
+    "population size":              4, 
+    "children per generation":      2, #number of new chromosomes per generation (< population size)
+    "gene mutation probability":    0.125, #probability that a gene will mutate 
+    "child mutation probability":   1, #probabilty that child will have mutation(s)
+    "number of gens":               200 #number of generations/iterations for study 
 }
 
 seed_wing = {
     #specifies traits of a seed wing to intialize population with. Optional input 
-    "span":                     5, 
-    "aspect ratio":             12,
-    "taper":                    0.6,
-    "sweep deg":                0,
-    "twist deg":                -3,
-    "root camber":              0.02,
-    "root camber location":     0.4,
-    "root thickness":           0.12,
-    "tip camber":               0.02,
+    "span":                     5,      #full wing span 
+    "aspect ratio":             12,     #full aspect ratio 
+    "taper":                    0.6,    #taper ratio 
+    "sweep deg":                10,     #wing sweep at quarter-chord line 
+    "twist deg":                -3,     #wing tip incidence angle (deg)
+    "root camber":              0.02,   #NACA X...
+    "root camber location":     0.4,    #NACA .X..
+    "root thickness":           0.12,   #NACA ..XX
+    "tip camber":               0.02, 
     "tip camber location":      0.4,
-    "tip thickness":            0.12,
-    "reynolds number":          Re
+    "tip thickness":            0.12, 
+    "reynolds number":          Re #reynolds # to chord ratio (be aware of this)
 }
 
 #user defined fitness function: 

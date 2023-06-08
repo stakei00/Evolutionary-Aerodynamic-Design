@@ -120,6 +120,7 @@ class Airfoil:
         self.drag_coefficient = cd_new 
 
         #interpolate drag coefficient
+        if len(self.lift_coefficient) < 2: return 
         cd_interp = np.interp(cl_interp, self.lift_coefficient, self.drag_coefficient)
         cd_min_ind = np.argmin(cd_interp)
 

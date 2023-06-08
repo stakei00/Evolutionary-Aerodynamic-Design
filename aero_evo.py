@@ -275,10 +275,14 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
 
 def initialize_plot():
         
+        import matplotlib
         import matplotlib.pyplot as plt
         plt.ion()
         #plt.style.use("dark_background")
+        matplotlib.rcParams["toolbar"] = "None" #hide the toolbar
         fig = plt.figure(figsize=(16,8))
+        fig.canvas.manager.set_window_title("live plot")
+        fig.suptitle("Genetic Wing Study", fontweight="bold")
         gs = fig.add_gridspec(3,4)
 
         ax1 = fig.add_subplot(gs[0,:3])
@@ -310,7 +314,8 @@ def update_plot(fig, axs, population, prev_best_chrom, status_msg, time0=None,):
     best_wing.plot_wing_airfoils(ax2, linecolor="black")
     
     n = len(population.best_chrom_fitness)
-    ax3.plot(range(n),population.best_chrom_fitness, "-o", color="red", linewidth=0.5)
+    ax3.plot(range(n),population.best_chrom_fitness, "-o", color="red",\
+             linewidth=0.5, markersize=3)
     
     text =  f"status: {status_msg}\n"
 
