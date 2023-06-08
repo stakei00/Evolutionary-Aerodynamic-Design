@@ -1,10 +1,10 @@
 PLOP
 G F
 
-NACA 2318
+NACA 2404
 PANE
 OPER
-Visc 200000.0
+Visc 300000.0
 PACC
 polar_file.txt
 
