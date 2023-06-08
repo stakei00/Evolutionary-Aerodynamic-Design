@@ -3,14 +3,22 @@ import random
 import airfoil
 import numpy as np
 import multiprocessing
+import time
 
 class Population:
     """
     creates and manipulates population
     """
-    def __init__(self, size:int, wing_parameters:dict, airfoil_hist:dict=None) -> None: 
+    def __init__(self, size:int, wing_parameters:dict, seed_wing:dict=None,\
+                 airfoil_hist:dict=None) -> None: 
         """
         initializes population of chromosomes
+        Inputs: 
+            size: size of the population 
+            wing_parameters: values and ranges for wing independent parameters 
+            seed_wing: if provided, population initializes with clones of this wing 
+            airfoil_hist: if provided, store XFOIL solutions for future reference 
+                (speeds things up)
         """
         self.chroms = []
         self.airfoil_hist = airfoil_hist
@@ -25,18 +33,18 @@ class Population:
 
             self.variables[key] = wing_parameters[key]
 
-        def unpack_parameters_dict():
+        def unpack_parameters_dict(parameters_dict):
             root, tip, span, taper, AR, sweep, twist = [None,None,None],\
                     [None,None,None],None,None,None,None,None 
 
             chrom_header = {}
-            for key in wing_parameters.keys(): 
+            for key in parameters_dict.keys(): 
 
-                    if isinstance(wing_parameters[key], list or tuple): 
-                        val = random.uniform(wing_parameters[key][0], wing_parameters[key][-1])
+                    if isinstance(parameters_dict[key], list or tuple): 
+                        val = random.uniform(parameters_dict[key][0], parameters_dict[key][-1])
                         chrom_header[key] = val
                     else:
-                        val = wing_parameters[key]
+                        val = parameters_dict[key]
 
                     if key == "span":                   span = val
                     elif key == "aspect ratio":         AR = val 
@@ -56,9 +64,20 @@ class Population:
             
             return chrom_header, root, tip, span, taper, AR, sweep, twist
         
+        parameters_dict = wing_parameters
+        if seed_wing is not None: #if a seed wing is provided use instead of rng 
+            
+            seed_chrom_header = {}
+            for key in parameters_dict.keys():
+                if isinstance(wing_parameters[key], list):
+                    seed_chrom_header[key] = seed_wing[key] 
+
+            parameters_dict = seed_wing
+
         while len(self.chroms) < size:
             
-            chrom_header, root, tip, span, taper, AR, sweep, twist = unpack_parameters_dict()
+            chrom_header, root, tip, span, taper, AR, sweep, twist = unpack_parameters_dict(parameters_dict)
+            if seed_wing is not None: chrom_header = seed_chrom_header
 
             airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], 10e6, airfoil_hist=self.airfoil_hist)
             if not hasattr(airfoil_root, "CDCL_avl"): continue
@@ -74,9 +93,9 @@ class Population:
 
     def selection(self, k) -> None: 
         """
-        reduces number of chromosomes using truncation selection based on 
+        reduces number of chromosomes using truncation-selection based on 
         individual fitness scores
-        k: # of killed off members 
+        k: # of members to delete
         """
         chroms_sorted = sorted(self.chroms, key=lambda c: c.fitness)
         self.chroms = chroms_sorted[k:]
@@ -133,7 +152,7 @@ class Population:
                 for key in child_chrom_header.keys(): 
                     
                     if random.uniform(0,1) >= p_gene_mut: continue 
-                    mutation_factor = np.random.normal()
+                    mutation_factor = np.random.normal(loc=1)
                     child_chrom_header[key] *= mutation_factor
                     
                     upper_lim, lower_lim = self.variables[key][-1], self.variables[key][0]
@@ -159,10 +178,13 @@ class Population:
         [self.chroms.append(chrom) for chrom in new_chroms] #add children to population 
 
     def get_best_chrom(self) -> None:
-
+        """
+        finds best fitness chromosome in the population
+        """
         chroms_sorted = sorted(self.chroms, key=lambda c: c.fitness)
         self.best_chrom = chroms_sorted[-1]
         self.best_chrom_fitness.append(self.best_chrom.fitness) 
+
 
 class Chromosome(wing.Wing):
     """
@@ -171,7 +193,7 @@ class Chromosome(wing.Wing):
     def __init__(self, airfoil_root, airfoil_tip, span, taper_ratio, \
                          aspect_ratio, sweep_deg, twist_deg) -> None: 
         """
-        create individual wing
+        creates individual wing
         """
         super().__init__(airfoil_root, airfoil_tip, span, taper_ratio, \
                          aspect_ratio, sweep_deg, twist_deg)
@@ -182,14 +204,18 @@ class Chromosome(wing.Wing):
         """
         self.fitness = fitness_func(self)
 
-def optimize(wing_parameters:dict, study_parameters:dict, fitness_function, airfoil_history_path:str=None, live_plot=False) -> object:
+
+def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
+             seed_wing:dict=None, airfoil_history_path:str=None,\
+                live_plot=False) -> object:
     """
-    
+    Runs genetic algorithm study
     """
+    t_start = time.time()/60
     if live_plot: 
+        import matplotlib.pyplot as plt
         fig, axs = initialize_plot()
-    n = 0
-    best_chrom = None
+      
     #open airfoil history file
     airfoil_hist = None 
     if airfoil_history_path is not None: 
@@ -201,15 +227,17 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function, airf
     k = study_parameters["children per generation"]
     p_gene_mut, p_child_mut = study_parameters["gene mutation probability"],\
                                 study_parameters["child mutation probability"]
-    population = Population(size=popSize, wing_parameters=wing_parameters, airfoil_hist=airfoil_hist)  
+    population = Population(size=popSize, wing_parameters=wing_parameters,\
+                            seed_wing=seed_wing, airfoil_hist=airfoil_hist)  
     [chrom.evaluate_fitness(fitness_function) for chrom in population.chroms]
     population.get_best_chrom()
     nIter = study_parameters["number of gens"]
     
     prev_best = population.best_chrom
+    n = 0  
     while n < nIter:
 
-        if live_plot: update_plot(fig, axs, population, prev_best)
+        if live_plot: update_plot(fig, axs, population, prev_best, "running...", time0=t_start)
 
         prev_best = population.best_chrom
         population.selection(k) #kill off worst performing chromosomes
@@ -218,11 +246,17 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function, airf
         population.get_best_chrom()
         n += 1  
     
+    if live_plot: 
+        update_plot(fig, axs, population, prev_best, "finished", time0=t_start)
+        plt.ioff()
+        plt.show()
+
     #save airfoil history  
     json.dump(population.airfoil_hist, open(airfoil_history_path, "w"))
 
     #return    
-    return best_chrom
+    return population.best_chrom
+
 
 def initialize_plot():
         
@@ -241,13 +275,16 @@ def initialize_plot():
         ax3 = fig.add_subplot(gs[2,:])
         ax3.set_xlabel("generation")
         ax3.set_ylabel("best fitness")
+        ax3.grid()
+
         ax4 = fig.add_subplot(gs[:2,3])
         ax4.set_xlim(0,1), ax4.set_ylim(0,1)
         
 
         return fig, [ax1, ax2, ax3, ax4]
 
-def update_plot(fig, axs, population, prev_best_chrom):
+
+def update_plot(fig, axs, population, prev_best_chrom, status_msg, time0=None,):
     ax1, ax2, ax3, ax4 = axs
     ax1.clear(), ax2.clear(), ax4.clear()
 
@@ -258,9 +295,14 @@ def update_plot(fig, axs, population, prev_best_chrom):
     best_wing.plot_wing_airfoils(ax2, linecolor="black")
     
     n = len(population.best_chrom_fitness)
-    ax3.plot(range(n),population.best_chrom_fitness, "-o", color="red", linewidth=1)
+    ax3.plot(range(n),population.best_chrom_fitness, "-o", color="red", linewidth=0.5)
     
-    text =  f"generation number: {n}\n" +\
+    text =  f"status: {status_msg}\n"
+
+    if time0 is not None:
+        text += f"time elapsed: {round(time.time()/60 - time0,2)} mins\n"
+
+    text += f"generation number: {n}\n" +\
             f"best fitness: {round(population.best_chrom_fitness[-1],3)}\n\n" +\
             f"root airfoil: NACA{best_wing.airfoil_root.NACA_4series_desig}\n" +\
             f"tip airfoil:  NACA{best_wing.airfoil_tip.NACA_4series_desig}\n" +\
@@ -269,6 +311,7 @@ def update_plot(fig, axs, population, prev_best_chrom):
             f"taper ratio: {round(best_wing.taper,3)}\n" +\
             f"q-chord sweep: {round(best_wing.sweep_deg,2)} deg\n" +\
             f"tip twist: {round(best_wing.tip_twist_deg,2)} deg\n"
+    
     try: text += f"max lift coefficient: {round(best_wing.max_lift_coefficient, 2)}\n"
     except: pass 
                 

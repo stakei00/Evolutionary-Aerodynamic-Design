@@ -1,9 +1,15 @@
 import aero_evo as evo 
 """
-
+script to run an optimization. Specifiy wing and study parameters, provide 
+a seed wing (optional) and define your fitness function. The algorithm will 
+MAXIMIZE the scalar fitness score, so if you are trying to minimize the scalar,  
+it should return its inverse or negative. Fitness function could also 
+return a generic score based on multiple desirable traits each with scoring weights. 
+(the sky's the limit)
 """
 
 wing_parameters = {
+    #defines the fixed and varying parameters. varying parameters must be specified as list 
     "span":                     5, 
     "aspect ratio":             12,
     "taper":                    [0.2, 1],
@@ -14,17 +20,35 @@ wing_parameters = {
     "root thickness":           [0.04, 0.3],
     "tip camber":               [0, 0.08],
     "tip camber location":      [0.2, 0.6],
-    "tip thickness":            [0.04, 0.3]
+    "tip thickness":            [0.04, 0.3],
+    "reynolds number":          3e5
 }
 
 study_parameters = {
+    #defines genetic algorithm study settings
     "population size":              4,
     "children per generation":      2, 
-    "gene mutation probability":    0.2,
-    "child mutation probability":   0.4,
-    "number of gens":               100
+    "gene mutation probability":    0.125,
+    "child mutation probability":   1,
+    "number of gens":               5
 }
 
+seed_wing = {
+    #specifies traits of a seed wing to intialize population with. Optional input 
+    "span":                     5, 
+    "aspect ratio":             12,
+    "taper":                    0.6,
+    "sweep deg":                0,
+    "twist deg":                -3,
+    "root camber":              0.02,
+    "root camber location":     0.4,
+    "root thickness":           0.12,
+    "tip camber":               0.02,
+    "tip camber location":      0.4,
+    "tip thickness":            0.12
+}
+
+#user defined fitness function: 
 def fitness(wing:object):
     """
     returns a fitness based on the highest lift-to-drag ratio
@@ -33,6 +57,8 @@ def fitness(wing:object):
     lift_to_drag = np.divide(wing.lift_coefficient,wing.drag_coefficient)
     return max(lift_to_drag)
 
+#optimization function call 
 optimized_wing = evo.optimize(wing_parameters=wing_parameters, \
-                study_parameters=study_parameters, fitness_function=fitness, \
-                    airfoil_history_path="airfoil_history.json", live_plot=True)
+            study_parameters=study_parameters, fitness_function=fitness,\
+                seed_wing=seed_wing, airfoil_history_path="airfoil_history.json",\
+                    live_plot=True)

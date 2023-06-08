@@ -112,8 +112,8 @@ class Wing:
         vert_ax_data = [0, -self.root_chord,-self.root_chord, \
                         -self.x_t-self.tip_chord,-self.x_t-self.tip_chord, \
                             -self.x_t,-self.x_t, 0]
-        ax.plot(horz_ax_data, vert_ax_data, color=linecolor)
-        ax.plot([-1*x for x in horz_ax_data], vert_ax_data, color=linecolor)
+        ax.plot(horz_ax_data, vert_ax_data, color=linecolor, linewidth=1)
+        ax.plot([-1*x for x in horz_ax_data], vert_ax_data, color=linecolor, linewidth=1)
         #ax.fill(horz_ax_data, vert_ax_data, facecolor="aliceblue")
         #ax.fill([-1*x for x in horz_ax_data], vert_ax_data, facecolor="aliceblue")
         ax.set_aspect("equal", adjustable="box")

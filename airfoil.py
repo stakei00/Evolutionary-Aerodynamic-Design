@@ -26,11 +26,6 @@ class Airfoil:
             self.NACA_4series_desig += "0"
         self.NACA_4series_desig += str(int(round(t*100, 0)))                     
 
-        #!bypassing xfoil run for debugging
-        #self.CDCL_avl = [-0.888, 0.00926, 0.6019, 0.00539, 1.8253, 0.01739] 
-        #self.max_lift_coefficient = 1.8253
-        #return
-
         #if airfoil history dictionary is provided, see if self is in it 
         if airfoil_hist is not None: 
             if self.NACA_4series_desig in airfoil_hist.keys():
@@ -199,7 +194,7 @@ class Airfoil:
             y = np.add(origin[1], y)
 
         #plot them lines! 
-        ax.plot(x, y, color=linecolor)
+        ax.plot(x, y, color=linecolor, linewidth=1)
         
 """
 if __name__ == "__main__":
