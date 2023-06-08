@@ -13,7 +13,7 @@ span = 10
 taper = 0.5
 AR = 12
 sweep_deg = 10
-twist_deg = -5
+twist_deg = -10
 
 test_wing = wing.Wing(afoil_root, afoil_tip, span, taper, AR, sweep_deg, twist_deg)
 

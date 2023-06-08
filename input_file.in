@@ -1,7 +1,7 @@
 PLOP
 G F
 
-NACA 4412
+NACA 0013
 PANE
 OPER
 Visc 10000000.0
@@ -9,7 +9,7 @@ PACC
 polar_file.txt
 
 ITER 50
-ASeq -12 15 1
+ASeq -24 24 2
 
 
 quit

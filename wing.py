@@ -64,9 +64,12 @@ class Wing:
 
     def interpolate_avl_results(self) -> None:
 
-        self.alpha = np.linspace(self.avl_results.Alpha[0], self.avl_results.Alpha[-1], 100)
-        self.lift_coefficient = np.interp(self.alpha, self.avl_results.Alpha, self.avl_results.CLtot)
-        self.drag_coefficient = np.interp(self.alpha, self.avl_results.Alpha, self.avl_results.CDtot)        
+        self.alpha = np.linspace(self.avl_results.Alpha[0], \
+                                 self.avl_results.Alpha[-1], 100)
+        self.lift_coefficient = np.interp(self.alpha, self.avl_results.Alpha, \
+                                          self.avl_results.CLtot)
+        self.drag_coefficient = np.interp(self.alpha, self.avl_results.Alpha, \
+                                          self.avl_results.CDtot)        
 
     def get_max_lift_coefficient(self) -> None: 
         """
@@ -101,23 +104,28 @@ class Wing:
                 self.max_lift_coefficient = lift_coefficient[i]
                 break 
 
-    def plot_wing_planform(self, ax, linecolor:str="black") -> None:
+    def plot_wing_planform(self, ax, linecolor:str="white") -> None:
         """
         
         """
         horz_ax_data = [0,0,0, self.span/2,self.span/2, self.span/2,self.span/2, 0]
-        vert_ax_data = [0, -self.root_chord,-self.root_chord, -self.x_t-self.tip_chord,-self.x_t-self.tip_chord, -self.x_t,-self.x_t, 0]
+        vert_ax_data = [0, -self.root_chord,-self.root_chord, \
+                        -self.x_t-self.tip_chord,-self.x_t-self.tip_chord, \
+                            -self.x_t,-self.x_t, 0]
         ax.plot(horz_ax_data, vert_ax_data, color=linecolor)
         ax.plot([-1*x for x in horz_ax_data], vert_ax_data, color=linecolor)
         #ax.fill(horz_ax_data, vert_ax_data, facecolor="aliceblue")
         #ax.fill([-1*x for x in horz_ax_data], vert_ax_data, facecolor="aliceblue")
         ax.set_aspect("equal", adjustable="box")
 
-    def plot_wing_airfoils(self, ax, linecolor:str="black") -> None:
+    def plot_wing_airfoils(self, ax, linecolor:str="white") -> None:
         """
         
         """
-        self.airfoil_root.plot_airfoil(ax, chord_scale=self.root_chord, linecolor=linecolor)
-        self.airfoil_tip.plot_airfoil(ax, chord_scale=self.tip_chord, twist_deg=self.tip_twist_deg, origin=(-self.x_t,0), linecolor=linecolor)
+        self.airfoil_root.plot_airfoil(ax, chord_scale=self.root_chord, \
+                                       linecolor=linecolor)
+        self.airfoil_tip.plot_airfoil(ax, chord_scale=self.tip_chord, \
+                                twist_deg=self.tip_twist_deg, \
+                                    origin=(-self.x_t,0), linecolor=linecolor)
+        
         ax.set_aspect("equal", adjustable="box")
-
