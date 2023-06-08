@@ -26,6 +26,7 @@ class Population:
         
         self.variables = {} #variables and limits
         self.constants = {}
+        self.Re = wing_parameters["reynolds number"] #TODO temporary bandaid fix doesn't allow for Re range 
         for key in wing_parameters.keys():
             if not isinstance(wing_parameters[key], list): 
                 self.constants[key] = wing_parameters[key]
@@ -34,8 +35,8 @@ class Population:
             self.variables[key] = wing_parameters[key]
 
         def unpack_parameters_dict(parameters_dict):
-            root, tip, span, taper, AR, sweep, twist = [None,None,None],\
-                    [None,None,None],None,None,None,None,None 
+            root, tip, span, taper, AR, sweep, twist, Re = [None,None,None],\
+                    [None,None,None],None,None,None,None,None,None
 
             chrom_header = {}
             for key in parameters_dict.keys(): 
@@ -57,12 +58,13 @@ class Population:
                     elif key == "tip camber":           tip[0] = val
                     elif key == "tip camber location":  tip[1] = val
                     elif key == "tip thickness":        tip[2] = val
+                    elif key == "reynolds number":      Re = val
 
             if None in [root[0], root[1], root[2], tip[0], tip[1], tip[2],\
-                        span, taper, AR, sweep, twist]: 
+                        span, taper, AR, sweep, twist, Re]: 
                 raise ValueError("some input left unspecified")
             
-            return chrom_header, root, tip, span, taper, AR, sweep, twist
+            return chrom_header, root, tip, span, taper, AR, sweep, twist, Re
         
         parameters_dict = wing_parameters
         if seed_wing is not None: #if a seed wing is provided use instead of rng 
@@ -76,14 +78,19 @@ class Population:
 
         while len(self.chroms) < size:
             
-            chrom_header, root, tip, span, taper, AR, sweep, twist = unpack_parameters_dict(parameters_dict)
+            chrom_header, root, tip, span, taper, AR, sweep, twist, Re = unpack_parameters_dict(parameters_dict)
+            if Re == 0: raise ValueError("Reynolds Number too Low")
             if seed_wing is not None: chrom_header = seed_chrom_header
 
-            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], 10e6, airfoil_hist=self.airfoil_hist)
+            root_chord = 2*span/(AR*(1+taper))
+            Re_root = round(Re*root_chord, -5)
+            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root, airfoil_hist=self.airfoil_hist)
             if not hasattr(airfoil_root, "CDCL_avl"): continue
             self.airfoil_hist = airfoil_root.try_add_to_hist(self.airfoil_hist) 
 
-            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], 10e6, airfoil_hist=self.airfoil_hist)
+            tip_chord = taper*root_chord
+            Re_tip = round(Re*tip_chord, -5)
+            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip, airfoil_hist=self.airfoil_hist)
             if not hasattr(airfoil_tip, "CDCL_avl"): continue
             self.airfoil_hist = airfoil_tip.try_add_to_hist(self.airfoil_hist)
 
@@ -163,11 +170,15 @@ class Population:
 
             root, tip, span, taper, AR, sweep, twist = extract_inputs(child_chrom_header, self.constants)
 
-            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], 10e6, airfoil_hist=self.airfoil_hist)
+            root_chord = 2*span/(AR*(1+taper))
+            Re_root = round(self.Re*root_chord, -5)
+            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root, airfoil_hist=self.airfoil_hist)
             if not hasattr(airfoil_root, "CDCL_avl"): continue
             self.airfoil_hist = airfoil_root.try_add_to_hist(self.airfoil_hist)
              
-            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], 10e6, airfoil_hist=self.airfoil_hist)
+            tip_chord = taper*root_chord
+            Re_tip = round(self.Re*tip_chord, -5)
+            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip, airfoil_hist=self.airfoil_hist)
             if not hasattr(airfoil_tip, "CDCL_avl"): continue
             self.airfoil_hist = airfoil_tip.try_add_to_hist(self.airfoil_hist)
             
@@ -225,6 +236,9 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
     #intialize population of m individuals
     popSize = study_parameters["population size"]
     k = study_parameters["children per generation"]
+    if k >= popSize: 
+        raise ValueError("invalid children per generation and population size")
+    
     p_gene_mut, p_child_mut = study_parameters["gene mutation probability"],\
                                 study_parameters["child mutation probability"]
     population = Population(size=popSize, wing_parameters=wing_parameters,\
@@ -237,7 +251,8 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
     n = 0  
     while n < nIter:
 
-        if live_plot: update_plot(fig, axs, population, prev_best, "running...", time0=t_start)
+        if live_plot: update_plot(fig, axs, population, prev_best, "running...",\
+                                   time0=t_start)
 
         prev_best = population.best_chrom
         population.selection(k) #kill off worst performing chromosomes
@@ -320,3 +335,29 @@ def update_plot(fig, axs, population, prev_best_chrom, status_msg, time0=None,):
     ax4.text(0.05, 0.03, text, fontsize=10, ha="left", va="top")
     fig.canvas.draw()
     fig.canvas.flush_events()
+
+
+def get_reynolds_number(h:float , V:float, units:str, l:float=1) -> float:
+    
+    def get_reynolds_number_SI(h_m, V_m_s, l_m):
+        dens_kg_m3 = (1.04884 - 23.659414e-6*h_m)**4.2558797
+        temp_k = 288.15 - 6.5e-3*h_m
+        temp_ref_k = 273.15
+        S_k = 110.4
+        dynVsc_pas = 1.716e-5*(temp_k/temp_ref_k)**(3/2)*(temp_ref_k + S_k)/(temp_k + S_k)
+        Re = dens_kg_m3*V_m_s*l_m/dynVsc_pas
+        return Re   
+
+    def get_reynolds_number_US(h_ft, V_ft_s, l_ft): 
+        h_m = 0.3048*h_ft
+        V_m_s = 0.3048*V_ft_s
+        l_m = 0.3048*l_ft
+        return get_reynolds_number_SI(h_m, V_m_s, l_m)
+
+    if units in ["SI", "metric"]:
+        return get_reynolds_number_SI(h, V, l)
+    
+    elif units in ["US", "imperial"]:
+        return get_reynolds_number_US(h, V, l)
+    else: 
+        raise ValueError("unknown units")

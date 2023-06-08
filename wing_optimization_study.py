@@ -4,12 +4,18 @@ script to run an optimization. Specifiy wing and study parameters, provide
 a seed wing (optional) and define your fitness function. The algorithm will 
 MAXIMIZE the scalar fitness score, so if you are trying to minimize the scalar,  
 it should return its inverse or negative. Fitness function could also 
-return a generic score based on multiple desirable traits each with scoring weights. 
-(the sky's the limit)
+return a generic score based on multiple desirable traits each with scoring 
+weights. (the sky's the limit)
 """
 
+#get reynolds number at design flight conditions (based on L_ref = 1)
+altitude_ft = 1000
+true_airspeed_ft_s = 80
+Re = evo.get_reynolds_number(altitude_ft, true_airspeed_ft_s, units="US")
+
 wing_parameters = {
-    #defines the fixed and varying parameters. varying parameters must be specified as list 
+    #defines the fixed and varying parameters. varying parameters must be 
+    # specified as list 
     "span":                     5, 
     "aspect ratio":             12,
     "taper":                    [0.2, 1],
@@ -21,13 +27,13 @@ wing_parameters = {
     "tip camber":               [0, 0.08],
     "tip camber location":      [0.2, 0.6],
     "tip thickness":            [0.04, 0.3],
-    "reynolds number":          3e5
+    "reynolds number":          Re
 }
 
 study_parameters = {
     #defines genetic algorithm study settings
-    "population size":              4,
-    "children per generation":      2, 
+    "population size":              6,
+    "children per generation":      3, 
     "gene mutation probability":    0.125,
     "child mutation probability":   1,
     "number of gens":               5
@@ -45,7 +51,8 @@ seed_wing = {
     "root thickness":           0.12,
     "tip camber":               0.02,
     "tip camber location":      0.4,
-    "tip thickness":            0.12
+    "tip thickness":            0.12,
+    "reynolds number":          Re
 }
 
 #user defined fitness function: 
@@ -59,6 +66,8 @@ def fitness(wing:object):
 
 #optimization function call 
 optimized_wing = evo.optimize(wing_parameters=wing_parameters, \
-            study_parameters=study_parameters, fitness_function=fitness,\
-                seed_wing=seed_wing, airfoil_history_path="airfoil_history.json",\
-                    live_plot=True)
+                    study_parameters=study_parameters,\
+                        fitness_function=fitness,\
+                            seed_wing=seed_wing,\
+                                airfoil_history_path="airfoil_history.json",\
+                                    live_plot=True)

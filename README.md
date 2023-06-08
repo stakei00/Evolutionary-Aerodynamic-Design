@@ -10,6 +10,9 @@ Packages: Numpy, Matplotlib, ...
 Custom Module: avlinput from OpenVSP with modified avlinput.py file 
 
 # How to use
+*before doing anything make sure a copy of xfoil.exe is placed in same directory 
+as your code*
+
 Intended use: create a python script, import aero_evo, build parameter 
 dictionaries and call the function aero_evo.optimize(). Run time benefits from 
 multiple cores. 

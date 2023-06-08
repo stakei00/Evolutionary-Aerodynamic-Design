@@ -16,6 +16,7 @@ class Airfoil:
         self.max_camber = m
         self.max_camber_loc = p
         self.thickness_to_chord = t
+        self.Re = Re
         
         #create equivalent NACA 4-digit designation
         if round(m*100, 0) < 1: 
@@ -31,9 +32,10 @@ class Airfoil:
             if self.NACA_4series_desig in airfoil_hist.keys():
                 self.CDCL_avl = airfoil_hist[self.NACA_4series_desig][0]
                 self.max_lift_coefficient = airfoil_hist[self.NACA_4series_desig][1]
+                self.Re = airfoil_hist[self.NACA_4series_desig][2]
                 return 
 
-        self.run_XFOIL(-24, 24, 2, Re, 50) #test numbers 
+        self.run_XFOIL(-24, 24, 2, self.Re, 50) #test numbers 
         if hasattr(self, "alpha"):
             self.find_3pt_drag_polar()
         
@@ -65,13 +67,10 @@ class Airfoil:
         input_file.write("\n\n")
         input_file.write("quit\n")
         input_file.close()
-        #subprocess.call("xfoil.exe < input_file.in", shell=True)
         
-        command = ["xfoil.exe"]
-        input_file = "input_file.in"
-        timeout_seconds = 15 #process will terminate after this amount of time 
-        process = subprocess.Popen(command, stdin=subprocess.PIPE)
-        with open(input_file, "r") as f: 
+        timeout_seconds = 10 #process will terminate after this amount of time 
+        process = subprocess.Popen(["xfoil.exe"], stdin=subprocess.PIPE)
+        with open("input_file.in", "r") as f: 
             input_content = f.read()
         process.stdin.write(input_content.encode())
         process.stdin.close()
@@ -139,7 +138,7 @@ class Airfoil:
         
         if self.NACA_4series_desig not in airfoil_hist.keys(): 
             airfoil_hist[self.NACA_4series_desig] = [self.CDCL_avl, \
-                                                  self.max_lift_coefficient]
+                                                  self.max_lift_coefficient, self.Re]
         return airfoil_hist
 
     def plot_airfoil(self, ax, chord_scale:float=None, origin:tuple or list=None,\
