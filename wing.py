@@ -129,3 +129,51 @@ class Wing:
                                     origin=(-self.x_t,0), linecolor=linecolor)
         
         ax.set_aspect("equal", adjustable="box")
+
+    def plot_avl_xfoil_results(self) -> None: 
+        """
+        creates a figure with several subplots showing results from AVL and xfoil 
+        """
+        import matplotlib.pyplot as plt 
+        fig = plt.figure(figsize=(12,8))
+        fig.canvas.manager.set_window_title("AVL XFOIL Results")
+        fig.suptitle("AVL and XFOIL Results")
+        gs = fig.add_gridspec(3,3)
+        ax1 = fig.add_subplot(gs[0,0])
+        ax2 = fig.add_subplot(gs[0,1])
+        ax3 = fig.add_subplot(gs[0,2])
+        ax4 = fig.add_subplot(gs[1,0])
+        ax5 = fig.add_subplot(gs[1,1])
+        ax6 = fig.add_subplot(gs[2,:2])
+        ax7 = fig.add_subplot(gs[1:,2])
+
+        #airfoil plots: 
+        ax1.plot(self.airfoil_root.alpha, self.airfoil_root.lift_coefficient,\
+                 label=f"r: NACA{self.airfoil_root.NACA_4series_desig}")
+        ax1.plot(self.airfoil_tip.alpha, self.airfoil_tip.lift_coefficient,\
+                 label=f"t: NACA{self.airfoil_tip.NACA_4series_desig}")
+        ax1.set_xlabel("$\u03B1^{\circ}$"), ax1.set_ylabel("$c_l$"), ax1.grid()
+        ax1.legend()
+
+        ax2.plot(self.airfoil_root.alpha, self.airfoil_root.moment_coefficient)
+        ax2.plot(self.airfoil_tip.alpha, self.airfoil_tip.moment_coefficient)
+        ax2.set_xlabel("$\u03B1^{\circ}$"), ax2.set_ylabel("$c_m$"), ax2.grid()
+
+        ax3.plot(self.airfoil_root.drag_coefficient, self.airfoil_root.lift_coefficient)
+        ax3.plot(self.airfoil_tip.drag_coefficient, self.airfoil_tip.lift_coefficient)
+        ax3.set_xlabel("$c_d$"), ax3.set_ylabel("$c_l$"), ax3.grid()
+        
+        #wing plots: 
+        ax4.plot(self.alpha, self.lift_coefficient, color="red", label="wing")
+        ax4.set_xlabel("$\u03B1^{\circ}$"), ax4.set_ylabel("$C_L$"), ax4.grid()
+        ax4.legend()
+
+
+        #ax5.plot(self.alpha, self.moment_coefficient)
+        #ax5.set_xlabel("$\u03B1^{\circ}$"), ax4.set_ylabel("$C_M$"), ax4.grid()
+
+        ax7.plot(self.drag_coefficient, self.lift_coefficient, color="red")
+        ax7.set_xlabel("$C_D$"), ax7.set_ylabel("$C_L$"), ax7.grid()
+
+        plt.show()
+

@@ -36,6 +36,7 @@ class Airfoil:
                 self.Re = airfoil_hist[self.NACA_4series_desig][2]
                 return 
 
+        #if self not found in the history, run XFOIL to get attributes
         self.run_XFOIL(aseq[0], aseq[1], aseq[2], self.Re, n_iter=n_iter, ncrit=ncrit) #test numbers 
         if hasattr(self, "alpha"):
             self.find_3pt_drag_polar()
@@ -109,19 +110,21 @@ class Airfoil:
         cl_min_ind = np.argmin(cl_interp)
         
         #trim alpha, cl, cd arrays 
-        alpha_new, cl_new, cd_new = [],[],[]
+        alpha_new, cl_new, cd_new, cm_new = [],[],[],[]
         for i,a in enumerate(self.alpha):
             if a < alpha_interp[cl_min_ind]: continue
             if a > alpha_interp[cl_max_ind]: continue
 
             alpha_new.append(a)
+            cm_new.append(self.moment_coefficient[i])
             cl_new.append(self.lift_coefficient[i])
             cd_new.append(self.drag_coefficient[i]) 
 
         #update attribute arrays 
         self.alpha = alpha_new 
         self.lift_coefficient = cl_new
-        self.drag_coefficient = cd_new 
+        self.drag_coefficient = cd_new
+        self.moment_coefficient = cm_new 
 
         #interpolate drag coefficient
         if len(self.lift_coefficient) < 2: return 
