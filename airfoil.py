@@ -3,7 +3,8 @@ import math
 
 class Airfoil:
 
-    def __init__(self, m:float, p:float, t:float, Re:int, airfoil_hist:dict=None) -> None:
+    def __init__(self, m:float, p:float, t:float, Re:int, aseq:list=[-15,15,1],\
+                 n_iter:int=300, ncrit:int=9, airfoil_hist:dict=None) -> None:
         """
         Initializes airfoil object
         Inputs:
@@ -35,12 +36,12 @@ class Airfoil:
                 self.Re = airfoil_hist[self.NACA_4series_desig][2]
                 return 
 
-        self.run_XFOIL(-24, 24, 2, self.Re, 50) #test numbers 
+        self.run_XFOIL(aseq[0], aseq[1], aseq[2], self.Re, n_iter=n_iter, ncrit=ncrit) #test numbers 
         if hasattr(self, "alpha"):
             self.find_3pt_drag_polar()
         
     def run_XFOIL(self, alpha_i:float, alpha_f:float, alpha_step:float, \
-                  Re:int or float, n_iter:int) -> None: 
+                  Re:int or float, n_iter:int, ncrit:int) -> None: 
         """
         Analysis of airfoil in XFOIL. Adds results to object attributes
         """
@@ -59,6 +60,9 @@ class Airfoil:
         input_file.write(f"NACA {self.NACA_4series_desig}\n")
         input_file.write("PANE\n")
         input_file.write("OPER\n")
+        input_file.write("VPAR\n")
+        input_file.write("N\n")
+        input_file.write(f"{ncrit}\n\n")
         input_file.write(f"Visc {Re}\n")
         input_file.write("PACC\n")
         input_file.write("polar_file.txt\n\n")
@@ -68,7 +72,7 @@ class Airfoil:
         input_file.write("quit\n")
         input_file.close()
         
-        timeout_seconds = 10 #process will terminate after this amount of time 
+        timeout_seconds = 30 #process will terminate after this amount of time 
         process = subprocess.Popen(["xfoil.exe"], stdin=subprocess.PIPE)
         with open("input_file.in", "r") as f: 
             input_content = f.read()
