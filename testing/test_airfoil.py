@@ -10,6 +10,7 @@ tests airfoil class methods for a few well-known airfoils
 class Test_Airfoil(unittest.TestCase):
 
     def test_naca1412(self):
+        print("testing naca1412")
         #test a few different reynolds numbers
         n1412_1e6 = airfoil.Airfoil(m=0.01, p=0.4, t=0.12, Re=1e6)
         n1412_5e5 = airfoil.Airfoil(m=0.01, p=0.4, t=0.12, Re=5e5)
@@ -25,6 +26,7 @@ class Test_Airfoil(unittest.TestCase):
         self.assertAlmostEqual(max_clcd_1e5, 44.1, places=-1)
 
     def test_naca2412(self):
+        print("testing naca2412")
         #test a few different reynolds numbers
         n2412_1e6 = airfoil.Airfoil(m=0.02, p=0.4, t=0.12, Re=1e6)
         n2412_5e5 = airfoil.Airfoil(m=0.02, p=0.4, t=0.12, Re=5e5)
@@ -40,6 +42,7 @@ class Test_Airfoil(unittest.TestCase):
         self.assertAlmostEqual(max_clcd_1e5, 50, places=-1)
     
     def test_naca4412(self):
+        print("testing naca4412")
         #test a few different reynolds numbers 
         n4412_1e6 = airfoil.Airfoil(m=0.04, p=0.4, t=0.12, Re=1e6)
         n4412_5e5 = airfoil.Airfoil(m=0.04, p=0.4, t=0.12, Re=5e5, aseq=[-12,15,1])
@@ -55,6 +58,7 @@ class Test_Airfoil(unittest.TestCase):
         self.assertAlmostEqual(max_clcd_1e5, 56.1, places=-1)
     
     def test_naca6412(self):
+        print("testing naca6412")
         #test a few different reynolds numbers 
         n6412_1e6 = airfoil.Airfoil(m=0.06, p=0.4, t=0.12, Re=1e6, aseq=[-10,15,1])
         n6412_5e5 = airfoil.Airfoil(m=0.06, p=0.4, t=0.12, Re=5e5, aseq=[-10,15,1])

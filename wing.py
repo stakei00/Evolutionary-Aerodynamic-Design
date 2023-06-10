@@ -26,7 +26,8 @@ class Wing:
         self.interpolate_avl_results()
         self.get_max_lift_coefficient()
 
-    def run_avl_on_wing(self, alpha_i:float, alpha_f:float, alpha_step:float) -> None: 
+    def run_avl_on_wing(self, alpha_i:float, alpha_f:float,\
+                        alpha_step:float) -> None: 
         """
         runs avl on wing configuration
         """
@@ -65,11 +66,13 @@ class Wing:
     def interpolate_avl_results(self) -> None:
 
         self.alpha = np.linspace(self.avl_results.Alpha[0], \
-                                 self.avl_results.Alpha[-1], 100)
+                                            self.avl_results.Alpha[-1], 100)
         self.lift_coefficient = np.interp(self.alpha, self.avl_results.Alpha, \
-                                          self.avl_results.CLtot)
+                                            self.avl_results.CLtot)
         self.drag_coefficient = np.interp(self.alpha, self.avl_results.Alpha, \
-                                          self.avl_results.CDtot)        
+                                            self.avl_results.CDtot) 
+        self.moment_coefficient = np.interp(self.alpha, self.avl_results.Alpha,\
+                                            self.avl_results.Cmtot)     
 
     def get_max_lift_coefficient(self) -> None: 
         """
@@ -104,7 +107,7 @@ class Wing:
                 self.max_lift_coefficient = lift_coefficient[i]
                 break 
 
-    def plot_wing_planform(self, ax, linecolor:str="white") -> None:
+    def plot_wing_planform(self, ax, linecolor:str="grey") -> None:
         """
         
         """
@@ -118,7 +121,7 @@ class Wing:
         #ax.fill([-1*x for x in horz_ax_data], vert_ax_data, facecolor="aliceblue")
         ax.set_aspect("equal", adjustable="box")
 
-    def plot_wing_airfoils(self, ax, linecolor:str="white") -> None:
+    def plot_wing_airfoils(self, ax, linecolor:str="grey") -> None:
         """
         
         """
@@ -168,12 +171,24 @@ class Wing:
         ax4.set_xlabel("$\u03B1^{\circ}$"), ax4.set_ylabel("$C_L$"), ax4.grid()
         ax4.legend()
 
-
-        #ax5.plot(self.alpha, self.moment_coefficient)
-        #ax5.set_xlabel("$\u03B1^{\circ}$"), ax4.set_ylabel("$C_M$"), ax4.grid()
+        ax5.plot(self.alpha, self.moment_coefficient, color="red")
+        ax5.set_xlabel("$\u03B1^{\circ}$"), ax5.set_ylabel("$C_M$"), ax5.grid()
 
         ax7.plot(self.drag_coefficient, self.lift_coefficient, color="red")
         ax7.set_xlabel("$C_D$"), ax7.set_ylabel("$C_L$"), ax7.grid()
+
+        for i,a in enumerate(self.avl_results.Alpha):
+            if a % 2 != 0: continue
+            cl = self.avl_results.stripForces[i].strips[0].cl
+            y = self.avl_results.stripForces[i].strips[0].yle
+            ax6.plot(y, cl, label=f"\u03B1 = {a}", linewidth=1, color="red")
+            ax6.annotate(str(a), (y[0], cl[0]), ha="right", va="center")
+        
+        ax6.plot([0, self.span/2],[self.airfoil_root.max_lift_coefficient,\
+                                    self.airfoil_tip.max_lift_coefficient],\
+                                        linestyle="dashed", color="black")
+        ax6.set_xlabel("y"), ax6.set_ylabel("$c_l$"), ax6.grid()
+        
 
         plt.show()
 

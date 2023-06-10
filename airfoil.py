@@ -3,7 +3,7 @@ import math
 
 class Airfoil:
 
-    def __init__(self, m:float, p:float, t:float, Re:int, aseq:list=[-15,15,1],\
+    def __init__(self, m:float, p:float, t:float, Re:int, aseq:list=[-15,24,1],\
                  n_iter:int=300, ncrit:int=9, airfoil_hist:dict=None) -> None:
         """
         Initializes airfoil object
@@ -37,11 +37,25 @@ class Airfoil:
                 return 
 
         #if self not found in the history, run XFOIL to get attributes
-        self.run_XFOIL(aseq[0], aseq[1], aseq[2], self.Re, n_iter=n_iter, ncrit=ncrit) #test numbers 
-        if hasattr(self, "alpha"):
-            self.find_3pt_drag_polar()
+        xfoil_data_neg = self.run_XFOIL_aseq(0, aseq[0], aseq[2], self.Re,\
+                            n_iter=n_iter, ncrit=ncrit) #negative angles of attack 
+        xfoil_data_pos = self.run_XFOIL_aseq(1, aseq[1], aseq[2], self.Re,\
+                            n_iter=n_iter, ncrit=ncrit) #positive angles of attack
         
-    def run_XFOIL(self, alpha_i:float, alpha_f:float, alpha_step:float, \
+        if None in [xfoil_data_neg, xfoil_data_pos]:
+            return
+
+        xfoil_data_neg = np.flipud(xfoil_data_neg)
+        xfoil_data = np.concatenate((xfoil_data_neg, xfoil_data_pos))
+
+        self.alpha = xfoil_data[:,0]
+        self.lift_coefficient = xfoil_data[:,1]
+        self.drag_coefficient = xfoil_data[:,2]
+        self.moment_coefficient = xfoil_data[:,4]
+
+        self.find_3pt_drag_polar()
+        
+    def run_XFOIL_aseq(self, alpha_i:float, alpha_f:float, alpha_step:float, \
                   Re:int or float, n_iter:int, ncrit:int) -> None: 
         """
         Analysis of airfoil in XFOIL. Adds results to object attributes
@@ -54,31 +68,29 @@ class Airfoil:
         if os.path.exists("polar_file.txt"):
             os.remove("polar_file.txt")
 
-        input_file = open("input_file.in", 'w')
-        input_file.write("PLOP\n")
-        input_file.write("G F\n")
-        input_file.write("\n")
-        input_file.write(f"NACA {self.NACA_4series_desig}\n")
-        input_file.write("PANE\n")
-        input_file.write("OPER\n")
-        input_file.write("VPAR\n")
-        input_file.write("N\n")
-        input_file.write(f"{ncrit}\n\n")
-        input_file.write(f"Visc {Re}\n")
-        input_file.write("PACC\n")
-        input_file.write("polar_file.txt\n\n")
-        input_file.write(f"ITER {n_iter}\n")
-        input_file.write(f"ASeq {alpha_i} {alpha_f} {alpha_step}\n")
-        input_file.write("\n\n")
-        input_file.write("quit\n")
-        input_file.close()
-        
-        timeout_seconds = 30 #process will terminate after this amount of time 
-        process = subprocess.Popen(["xfoil.exe"], stdin=subprocess.PIPE)
-        with open("input_file.in", "r") as f: 
-            input_content = f.read()
-        process.stdin.write(input_content.encode())
-        process.stdin.close()
+        input_content = "PLOP\n" +\
+            "G F\n" +\
+            "\n" +\
+            f"NACA {self.NACA_4series_desig}\n" +\
+            "PANE\n" +\
+            "OPER\n" +\
+            "VPAR\n" +\
+            "N\n" +\
+            f"{ncrit}\n\n" +\
+            f"Visc {Re}\n" +\
+            "PACC\n" +\
+            "polar_file.txt\n\n" +\
+            f"ITER {n_iter}\n" +\
+            f"ASeq {alpha_i} {alpha_f} {alpha_step}\n" +\
+            "\n\n" +\
+            "quit\n" 
+                
+        timeout_seconds = 10 #process will terminate after this amount of time 
+
+        with open(os.devnull, 'w') as null_file: 
+            process = subprocess.Popen(["xfoil.exe"], stdin=subprocess.PIPE, stdout=null_file)      
+            process.stdin.write(input_content.encode())
+            process.stdin.close()
 
         start_time = time.time()
         while time.time() - start_time < timeout_seconds:
@@ -88,23 +100,18 @@ class Airfoil:
 
         if process.poll() is None:
             process.terminate()
-            return
+            return None 
 
-        polar_data = np.loadtxt("polar_file.txt", skiprows=12)
-
-        if len(polar_data) < 1: #if xfoil failed
-            return 
+        try: 
+            return np.loadtxt("polar_file.txt", skiprows=12)
+        except: 
+            return None
         
-        self.alpha = polar_data[:,0]
-        self.lift_coefficient = polar_data[:,1]
-        self.drag_coefficient = polar_data[:,2]
-        self.moment_coefficient = polar_data[:,4] 
-
     def find_3pt_drag_polar(self) -> None: 
         """
         Gets 3 points on CLCD drag polar for use with AVL
         """
-        alpha_interp = np.linspace(min(self.alpha), max(self.alpha), 100)
+        alpha_interp = np.linspace(min(self.alpha), max(self.alpha), 200)
         cl_interp = np.interp(alpha_interp, self.alpha, self.lift_coefficient)
         cl_max_ind = np.argmax(cl_interp)
         cl_min_ind = np.argmin(cl_interp)
@@ -127,7 +134,8 @@ class Airfoil:
         self.moment_coefficient = cm_new 
 
         #interpolate drag coefficient
-        if len(self.lift_coefficient) < 2: return 
+        if len(self.lift_coefficient) < 2: 
+            return 
         cd_interp = np.interp(cl_interp, self.lift_coefficient, self.drag_coefficient)
         cd_min_ind = np.argmin(cd_interp)
 
@@ -203,7 +211,7 @@ class Airfoil:
         #plot them lines! 
         ax.plot(x, y, color=linecolor, linewidth=1)
         
-"""
+
 if __name__ == "__main__":
     m = 0.02
     p = 0.4
@@ -211,8 +219,6 @@ if __name__ == "__main__":
     re = 10e6
 
     af = Airfoil(m,p,t,re)
-    #af.run_XFOIL(alpha_i=-10, alpha_f=15, alpha_step=1, Re=1e6, n_iter=100)
-    #af.find_3pt_drag_polar()
 
     import matplotlib.pyplot as plt 
     plt.figure()
@@ -225,4 +231,3 @@ if __name__ == "__main__":
     plt.xlabel("C_d"), plt.ylabel("C_l")
     plt.show() 
     pass
-"""
