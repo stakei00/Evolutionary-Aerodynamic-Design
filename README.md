@@ -9,6 +9,9 @@ Python 3.9
 Packages: Numpy, Matplotlib, ... 
 Custom Module: avlinput from OpenVSP with modified avlinput.py file 
 
+please read the environment_setup_instructions.txt for getting your environment 
+set up properly
+
 # How to use
 *before doing anything make sure a copy of xfoil.exe is placed in same directory 
 as your code*

@@ -3,7 +3,7 @@ import aero_evo as evo
 script to run an optimization. Specifiy wing and study parameters, provide 
 a seed wing (optional) and define your fitness function. The algorithm will 
 MAXIMIZE the scalar fitness score, so if you are trying to minimize the scalar,  
-it should return its inverse or negative. Fitness function could also 
+fitness func should return its inverse or negative. Fitness function could also 
 return a generic score based on multiple desirable traits each with scoring 
 weights. (the sky's the limit)
 """
@@ -18,25 +18,25 @@ wing_parameters = {
     # specified as 2-element lists 
     "span":                     5,              #full wing span 
     "aspect ratio":             12,             #full aspect ratio
-    "taper":                    [0.2, 1],       #taper ratio 
-    "sweep deg":                10,             #wing sweep at qua
-    "twist deg":                [-10, 5],       #wing tip incidenc
-    "root camber":              [0, 0.08],      #NACA X...
+    "taper":                    [0.3, 1],       #taper ratio 
+    "sweep deg":                0,             #wing sweep at qua
+    "twist deg":                [-5, 5],       #wing tip incidenc
+    "root camber":              [0, 0.06],      #NACA X...
     "root camber location":     [0.2, 0.6],     #NACA .X..
-    "root thickness":           [0.04, 0.3],    #NACA ..XX
-    "tip camber":               [0, 0.08],
+    "root thickness":           [0.08, 0.2],    #NACA ..XX
+    "tip camber":               [0, 0.06],
     "tip camber location":      [0.2, 0.6],
-    "tip thickness":            [0.04, 0.3],
+    "tip thickness":            [0.08, 0.3],
     "reynolds number":          Re              #reynolds # to chord ratio (be aware of this)
 }  
 
 study_parameters = {
     #defines genetic algorithm study settings
-    "population size":              4, 
-    "children per generation":      2, #number of new chromosomes per generation (< population size)
+    "population size":              10, 
+    "children per generation":      5, #number of new chromosomes per generation (< population size)
     "gene mutation probability":    0.125, #probability that a gene will mutate 
-    "child mutation probability":   1, #probabilty that child will have mutation(s)
-    "number of gens":               200 #number of generations/iterations for study 
+    "child mutation probability":   0.5, #probabilty that child will have mutation(s)
+    "number of gens":               400 #number of generations/iterations for study 
 }
 
 seed_wing = {
@@ -44,7 +44,7 @@ seed_wing = {
     "span":                     5,      #full wing span 
     "aspect ratio":             12,     #full aspect ratio 
     "taper":                    0.6,    #taper ratio 
-    "sweep deg":                10,     #wing sweep at quarter-chord line 
+    "sweep deg":                0,     #wing sweep at quarter-chord line 
     "twist deg":                -3,     #wing tip incidence angle (deg)
     "root camber":              0.02,   #NACA X...
     "root camber location":     0.4,    #NACA .X..
@@ -70,5 +70,5 @@ optimized_wing = evo.optimize(wing_parameters=wing_parameters, \
                         fitness_function=fitness,\
                             seed_wing=None,\
                                 live_plot=True)
-
 optimized_wing.plot_avl_xfoil_results()
+optimized_wing.export_wing()

@@ -41,7 +41,7 @@ class Wing:
         #setting up root section 
         section_root = avlInput.AvlSection(chord=self.root_chord, Nspan=10, \
                             afile=["NACA",self.airfoil_root.NACA_4series_desig],\
-                                CDCL=self.airfoil_root.CDCL_avl)
+                                CDCL=self.airfoil_root.CDCL_avl,Sspace=1)
 
         #setting up tip section
         self.x_t = self.root_chord/4 - self.tip_chord/4 + \
@@ -51,10 +51,10 @@ class Wing:
                             chord=self.tip_chord, ainc=self.tip_twist_deg, \
                                 Nspan = 10, afile = \
                                     ["NACA",self.airfoil_tip.NACA_4series_desig],\
-                                        CDCL=self.airfoil_tip.CDCL_avl)
+                                        CDCL=self.airfoil_tip.CDCL_avl, Sspace=1)
 
         #setting up main wing surface 
-        surface = avlInput.AvlSurface(name="Wing", Nchord=12, Nspan=20)
+        surface = avlInput.AvlSurface(name="Wing", Nchord=12, Nspan=20, Sspace=1, Cspace=1)
         surface.addSections([section_root, section_tip])
 
         #running 
@@ -181,7 +181,7 @@ class Wing:
             if a % 2 != 0: continue
             cl = self.avl_results.stripForces[i].strips[0].cl
             y = self.avl_results.stripForces[i].strips[0].yle
-            ax6.plot(y, cl, label=f"\u03B1 = {a}", linewidth=1, color="red")
+            ax6.plot(y, cl, label=f"\u03B1 = {a}", linewidth=0.75, color="red")
             ax6.annotate(str(a), (y[0], cl[0]), ha="right", va="center")
         
         ax6.plot([0, self.span/2],[self.airfoil_root.max_lift_coefficient,\
@@ -192,3 +192,11 @@ class Wing:
 
         plt.show()
 
+    def export_wing(self): 
+        import pickle
+        import datetime
+
+        now = datetime.now()
+        current_time = now.strftime("%H_%M")
+        with open(f"wing_{current_time}", "wb") as file:
+            pickle.dump(self, file)

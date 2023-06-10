@@ -5,8 +5,8 @@ import os
 
 class Airfoil:
 
-    def __init__(self, m:float, p:float, t:float, Re:int, aseq:list=[-15,24,1],\
-                 n_iter:int=300, ncrit:int=9) -> None:
+    def __init__(self, m:float, p:float, t:float, Re:int, aseq:list=[-24,24,1],\
+                 n_iter:int=200, ncrit:int=9, search_airfoils=True) -> None:
         """
         Initializes airfoil object
         Inputs:
@@ -32,7 +32,7 @@ class Airfoil:
 
         #check if airfoil already exists in pickle depot
         filepath = f"airfoils/n{self.NACA_4series_desig}_{self.Re}"
-        if os.path.exists(filepath):
+        if os.path.exists(filepath) and search_airfoils:
             with open(filepath, "rb") as file:
                 airfoil = pickle.load(file)
                 self.alpha = airfoil.alpha
@@ -48,18 +48,26 @@ class Airfoil:
                             n_iter=n_iter, ncrit=ncrit) #negative angles of attack 
         xfoil_data_pos = self.run_XFOIL_aseq(1, aseq[1], aseq[2], self.Re,\
                             n_iter=n_iter, ncrit=ncrit) #positive angles of attack
-        try: 
-            xfoil_data_neg = np.flipud(xfoil_data_neg)
-            xfoil_data = np.concatenate((xfoil_data_neg, xfoil_data_pos))
-        except:return
 
-        self.alpha = xfoil_data[:,0]
-        self.lift_coefficient = xfoil_data[:,1]
-        self.drag_coefficient = xfoil_data[:,2]
-        self.moment_coefficient = xfoil_data[:,4]
+        if np.size(xfoil_data_neg) == 7: 
+            xfoil_data_neg = np.reshape(xfoil_data_neg, (1,7))
+        if np.size(xfoil_data_pos) == 7:
+            xfoil_data_pos = np.reshape(xfoil_data_pos, (1,7))
+        try: 
+            if np.size(xfoil_data_neg) > 7:
+                xfoil_data_neg = np.flipud(xfoil_data_neg)
+            xfoil_data = np.concatenate((xfoil_data_neg, xfoil_data_pos))
+            self.alpha = xfoil_data[:,0]
+            self.lift_coefficient = xfoil_data[:,1]
+            self.drag_coefficient = xfoil_data[:,2]
+            self.moment_coefficient = xfoil_data[:,4]
+        except: 
+            return
 
         self.find_3pt_drag_polar()
-        self.pickle_airfoil()
+        
+        if search_airfoils:
+            self.pickle_airfoil()
         
     def run_XFOIL_aseq(self, alpha_i:float, alpha_f:float, alpha_step:float, \
                   Re:int or float, n_iter:int, ncrit:int) -> None: 
@@ -91,7 +99,7 @@ class Airfoil:
             "\n\n" +\
             "quit\n" 
                 
-        timeout_seconds = 10 #process will terminate after this amount of time 
+        timeout_seconds = 12 #process will terminate after this amount of time 
 
         with open(os.devnull, 'w') as null_file: 
             process = subprocess.Popen(["xfoil.exe"], stdin=subprocess.PIPE, stdout=null_file)      
@@ -105,8 +113,9 @@ class Airfoil:
             time.sleep(0.1) 
 
         if process.poll() is None:
+            print(f"\nXFOIL process on NACA{self.NACA_4series_desig} timed out." +\
+                  f" Re = {self.Re}. Returning incomplete polar")
             process.terminate()
-            return None 
 
         try: 
             return np.loadtxt("polar_file.txt", skiprows=12)
@@ -217,12 +226,12 @@ class Airfoil:
 
 
 if __name__ == "__main__":
-    m = 0.02
-    p = 0.4
-    t = 0.12
+    m = 0.05
+    p = 0.2
+    t = 0.06
     re = 10e6
 
-    af = Airfoil(m,p,t,re)
+    af = Airfoil(m,p,t,re,search_airfoils=False)
 
     import matplotlib.pyplot as plt 
     plt.figure()
