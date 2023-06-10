@@ -9,19 +9,16 @@ class Population:
     """
     creates and manipulates population
     """
-    def __init__(self, size:int, wing_parameters:dict, seed_wing:dict=None,\
-                 airfoil_hist:dict=None) -> None: 
+    def __init__(self, size:int, wing_parameters:dict, seed_wing:dict=None) -> None: 
         """
         initializes population of chromosomes
         Inputs: 
             size: size of the population 
             wing_parameters: values and ranges for wing independent parameters 
             seed_wing: if provided, population initializes with clones of this wing 
-            airfoil_hist: if provided, store XFOIL solutions for future reference 
-                (speeds things up)
+
         """
         self.chroms = []
-        self.airfoil_hist = airfoil_hist
         self.best_chrom_fitness = []
         
         self.variables = {} #variables and limits
@@ -84,15 +81,13 @@ class Population:
 
             root_chord = 2*span/(AR*(1+taper))
             Re_root = round(Re*root_chord, -5)
-            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root, airfoil_hist=self.airfoil_hist)
+            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root)
             if not hasattr(airfoil_root, "CDCL_avl"): continue
-            self.airfoil_hist = airfoil_root.try_add_to_hist(self.airfoil_hist) 
 
             tip_chord = taper*root_chord
             Re_tip = round(Re*tip_chord, -5)
-            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip, airfoil_hist=self.airfoil_hist)
+            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip)
             if not hasattr(airfoil_tip, "CDCL_avl"): continue
-            self.airfoil_hist = airfoil_tip.try_add_to_hist(self.airfoil_hist)
 
             chrom = Chromosome(airfoil_root, airfoil_tip, span, taper, AR, sweep, twist)
             chrom.chrom_header = chrom_header
@@ -159,8 +154,8 @@ class Population:
                 for key in child_chrom_header.keys(): 
                     
                     if random.uniform(0,1) >= p_gene_mut: continue 
-                    mutation_factor = np.random.normal(loc=1)
-                    child_chrom_header[key] *= mutation_factor
+                    mutation_factor = np.random.normal(loc=0, scale=1)
+                    child_chrom_header[key] *= 1 + mutation_factor
                     
                     upper_lim, lower_lim = self.variables[key][-1], self.variables[key][0]
                     if child_chrom_header[key] < lower_lim: 
@@ -172,15 +167,13 @@ class Population:
 
             root_chord = 2*span/(AR*(1+taper))
             Re_root = round(self.Re*root_chord, -5)
-            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root, airfoil_hist=self.airfoil_hist)
+            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root)
             if not hasattr(airfoil_root, "CDCL_avl"): continue
-            self.airfoil_hist = airfoil_root.try_add_to_hist(self.airfoil_hist)
              
             tip_chord = taper*root_chord
             Re_tip = round(self.Re*tip_chord, -5)
-            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip, airfoil_hist=self.airfoil_hist)
+            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip)
             if not hasattr(airfoil_tip, "CDCL_avl"): continue
-            self.airfoil_hist = airfoil_tip.try_add_to_hist(self.airfoil_hist)
             
             new_chrom = Chromosome(airfoil_root, airfoil_tip, span, taper, AR, sweep, twist)
             new_chrom.chrom_header = child_chrom_header
@@ -217,8 +210,7 @@ class Chromosome(wing.Wing):
 
 
 def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
-             seed_wing:dict=None, airfoil_history_path:str=None,\
-                live_plot=False) -> object:
+             seed_wing:dict=None,live_plot=False) -> object:
     """
     Runs genetic algorithm study
     """
@@ -229,9 +221,6 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
       
     #open airfoil history file
     airfoil_hist = None 
-    if airfoil_history_path is not None: 
-        import json
-        airfoil_hist = json.load(open(airfoil_history_path, "r"))
 
     #intialize population of m individuals
     popSize = study_parameters["population size"]
@@ -242,7 +231,7 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
     p_gene_mut, p_child_mut = study_parameters["gene mutation probability"],\
                                 study_parameters["child mutation probability"]
     population = Population(size=popSize, wing_parameters=wing_parameters,\
-                            seed_wing=seed_wing, airfoil_hist=airfoil_hist)  
+                            seed_wing=seed_wing)  
     [chrom.evaluate_fitness(fitness_function) for chrom in population.chroms]
     population.get_best_chrom()
     nIter = study_parameters["number of gens"]
@@ -265,9 +254,6 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
         update_plot(fig, axs, population, prev_best, "finished", time0=t_start)
         plt.ioff()
         plt.show()
-
-    #save airfoil history  
-    json.dump(population.airfoil_hist, open(airfoil_history_path, "w"))
 
     #return    
     return population.best_chrom

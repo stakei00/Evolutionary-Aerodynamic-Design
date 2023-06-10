@@ -1,10 +1,12 @@
 import numpy as np 
 import math 
+import pickle
+import os
 
 class Airfoil:
 
     def __init__(self, m:float, p:float, t:float, Re:int, aseq:list=[-15,24,1],\
-                 n_iter:int=300, ncrit:int=9, airfoil_hist:dict=None) -> None:
+                 n_iter:int=300, ncrit:int=9) -> None:
         """
         Initializes airfoil object
         Inputs:
@@ -17,7 +19,7 @@ class Airfoil:
         self.max_camber = m
         self.max_camber_loc = p
         self.thickness_to_chord = t
-        self.Re = Re
+        self.Re = int(round(Re, -5))
         
         #create equivalent NACA 4-digit designation
         if round(m*100, 0) < 1: 
@@ -26,27 +28,30 @@ class Airfoil:
             self.NACA_4series_desig = str(int(10*round(m*100, 0) + round(p*10, 0)))
         if round(t*100,0) < 10: 
             self.NACA_4series_desig += "0"
-        self.NACA_4series_desig += str(int(round(t*100, 0)))                     
+        self.NACA_4series_desig += str(int(round(t*100, 0)))
 
-        #if airfoil history dictionary is provided, see if self is in it 
-        if airfoil_hist is not None: 
-            if self.NACA_4series_desig in airfoil_hist.keys():
-                self.CDCL_avl = airfoil_hist[self.NACA_4series_desig][0]
-                self.max_lift_coefficient = airfoil_hist[self.NACA_4series_desig][1]
-                self.Re = airfoil_hist[self.NACA_4series_desig][2]
-                return 
+        #check if airfoil already exists in pickle depot
+        filepath = f"airfoils/n{self.NACA_4series_desig}_{self.Re}"
+        if os.path.exists(filepath):
+            with open(filepath, "rb") as file:
+                airfoil = pickle.load(file)
+                self.alpha = airfoil.alpha
+                self.lift_coefficient = airfoil.lift_coefficient
+                self.drag_coefficient = airfoil.drag_coefficient 
+                self.moment_coefficient = airfoil.moment_coefficient
+                self.CDCL_avl = airfoil.CDCL_avl
+                self.max_lift_coefficient = airfoil.max_lift_coefficient
+            return 
 
         #if self not found in the history, run XFOIL to get attributes
         xfoil_data_neg = self.run_XFOIL_aseq(0, aseq[0], aseq[2], self.Re,\
                             n_iter=n_iter, ncrit=ncrit) #negative angles of attack 
         xfoil_data_pos = self.run_XFOIL_aseq(1, aseq[1], aseq[2], self.Re,\
                             n_iter=n_iter, ncrit=ncrit) #positive angles of attack
-        
-        if None in [xfoil_data_neg, xfoil_data_pos]:
-            return
-
-        xfoil_data_neg = np.flipud(xfoil_data_neg)
-        xfoil_data = np.concatenate((xfoil_data_neg, xfoil_data_pos))
+        try: 
+            xfoil_data_neg = np.flipud(xfoil_data_neg)
+            xfoil_data = np.concatenate((xfoil_data_neg, xfoil_data_pos))
+        except:return
 
         self.alpha = xfoil_data[:,0]
         self.lift_coefficient = xfoil_data[:,1]
@@ -54,6 +59,7 @@ class Airfoil:
         self.moment_coefficient = xfoil_data[:,4]
 
         self.find_3pt_drag_polar()
+        self.pickle_airfoil()
         
     def run_XFOIL_aseq(self, alpha_i:float, alpha_f:float, alpha_step:float, \
                   Re:int or float, n_iter:int, ncrit:int) -> None: 
@@ -147,16 +153,6 @@ class Airfoil:
         self.CDCL_avl = [cl1, cd1, cl2, cd2, cl3, cd3]
         self.max_lift_coefficient = cl_interp[cl_max_ind] 
 
-    def try_add_to_hist(self, airfoil_hist:dict) -> dict:
-        
-        if airfoil_hist is None or not hasattr(self, "CDCL_avl"): 
-            return 
-        
-        if self.NACA_4series_desig not in airfoil_hist.keys(): 
-            airfoil_hist[self.NACA_4series_desig] = [self.CDCL_avl, \
-                                                  self.max_lift_coefficient, self.Re]
-        return airfoil_hist
-
     def plot_airfoil(self, ax, chord_scale:float=None, origin:tuple or list=None,\
                       twist_deg:float=None, linecolor:str="black") -> None:
         """
@@ -210,7 +206,15 @@ class Airfoil:
 
         #plot them lines! 
         ax.plot(x, y, color=linecolor, linewidth=1)
-        
+
+    def pickle_airfoil(self):
+        """
+        saves the airfoil to pickle
+        """
+
+        with open(f"airfoils/n{self.NACA_4series_desig}_{self.Re}", "wb") as file:
+            pickle.dump(self, file)
+
 
 if __name__ == "__main__":
     m = 0.02

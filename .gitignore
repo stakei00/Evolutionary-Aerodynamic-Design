@@ -2,3 +2,5 @@ __pycache__/
 Deprecated/
 xfoil.exe
 .vscode/
+airfoils/*
+!airfoils/.gitkeep

@@ -36,7 +36,7 @@ study_parameters = {
     "children per generation":      2, #number of new chromosomes per generation (< population size)
     "gene mutation probability":    0.125, #probability that a gene will mutate 
     "child mutation probability":   1, #probabilty that child will have mutation(s)
-    "number of gens":               5 #number of generations/iterations for study 
+    "number of gens":               200 #number of generations/iterations for study 
 }
 
 seed_wing = {
@@ -68,8 +68,7 @@ def fitness(wing:object):
 optimized_wing = evo.optimize(wing_parameters=wing_parameters, \
                     study_parameters=study_parameters,\
                         fitness_function=fitness,\
-                            seed_wing=seed_wing,\
-                                airfoil_history_path="airfoil_history.json",\
-                                    live_plot=True)
+                            seed_wing=None,\
+                                live_plot=True)
 
 optimized_wing.plot_avl_xfoil_results()
