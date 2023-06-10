@@ -1,3 +1,5 @@
+import sys, os 
+sys.path.append(os.getcwd())
 import aero_evo as evo 
 """
 script to run an optimization. Specifiy wing and study parameters, provide 

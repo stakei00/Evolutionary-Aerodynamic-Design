@@ -1,8 +1,10 @@
+import sys, os
+sys.path.append(os.getcwd())
 import airfoil as af
 import wing
 
 """
-purpose of this scripy is to create a wing using two airfoils and analyze using 
+purpose of this script is to create a wing using two airfoils and analyze using 
 XFOIL and AVL
 """
 
