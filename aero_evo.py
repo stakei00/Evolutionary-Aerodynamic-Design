@@ -2,14 +2,14 @@ import wing
 import random
 import airfoil
 import numpy as np
-import multiprocessing
+import multiprocessing as mp
 import time
 
 class Population:
     """
     creates and manipulates population
     """
-    def __init__(self, size:int, wing_parameters:dict, seed_wing:dict=None) -> None: 
+    def __init__(self, size:int, wing_parameters:dict, mutation_probs:list, seed_wing:dict=None) -> None: 
         """
         initializes population of chromosomes
         Inputs: 
@@ -20,7 +20,10 @@ class Population:
         """
         self.chroms = []
         self.best_chrom_fitness = []
+        self.p_gene_mut = mutation_probs[1]
+        self.p_child_mut = mutation_probs[0]
         
+        #separate constants from variables 
         self.variables = {} #variables and limits
         self.constants = {}
         self.Re = wing_parameters["reynolds number"] #TODO temporary bandaid fix doesn't allow for Re range 
@@ -28,70 +31,105 @@ class Population:
             if not isinstance(wing_parameters[key], list): 
                 self.constants[key] = wing_parameters[key]
                 continue
-
             self.variables[key] = wing_parameters[key]
-
-        def unpack_parameters_dict(parameters_dict):
-            root, tip, span, taper, AR, sweep, twist, Re = [None,None,None],\
-                    [None,None,None],None,None,None,None,None,None
-
-            chrom_header = {}
-            for key in parameters_dict.keys(): 
-
-                    if isinstance(parameters_dict[key], list or tuple): 
-                        val = random.uniform(parameters_dict[key][0], parameters_dict[key][-1])
-                        chrom_header[key] = val
-                    else:
-                        val = parameters_dict[key]
-
-                    if key == "span":                   span = val
-                    elif key == "aspect ratio":         AR = val 
-                    elif key == "taper":                taper = val
-                    elif key == "sweep deg":            sweep = val
-                    elif key == "twist deg":            twist = val 
-                    elif key == "root camber":          root[0] = val
-                    elif key == "root camber location": root[1] = val
-                    elif key == "root thickness":       root[2] = val
-                    elif key == "tip camber":           tip[0] = val
-                    elif key == "tip camber location":  tip[1] = val
-                    elif key == "tip thickness":        tip[2] = val
-                    elif key == "reynolds number":      Re = val
-
-            if None in [root[0], root[1], root[2], tip[0], tip[1], tip[2],\
-                        span, taper, AR, sweep, twist, Re]: 
-                raise ValueError("some input left unspecified")
-            
-            return chrom_header, root, tip, span, taper, AR, sweep, twist, Re
         
         parameters_dict = wing_parameters
         if seed_wing is not None: #if a seed wing is provided use instead of rng 
-            
             seed_chrom_header = {}
             for key in parameters_dict.keys():
                 if isinstance(wing_parameters[key], list):
                     seed_chrom_header[key] = seed_wing[key] 
 
-            parameters_dict = seed_wing
-
         while len(self.chroms) < size:
             
-            chrom_header, root, tip, span, taper, AR, sweep, twist, Re = unpack_parameters_dict(parameters_dict)
-            if Re == 0: raise ValueError("Reynolds Number too Low")
-            if seed_wing is not None: chrom_header = seed_chrom_header
+            num_to_gen = size - len(self.chroms)
+            if mp.cpu_count() < num_to_gen:
+                num_to_gen = mp.cpu_count()
 
-            root_chord = 2*span/(AR*(1+taper))
-            Re_root = round(Re*root_chord, -5)
-            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root)
-            if not hasattr(airfoil_root, "CDCL_avl"): continue
+            if seed_wing is not None: 
+                headers = [seed_chrom_header for _ in range(num_to_gen)]
+            else: 
+                headers = [self.create_header(mutate=False) for _ in range(num_to_gen)]
 
-            tip_chord = taper*root_chord
-            Re_tip = round(Re*tip_chord, -5)
-            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip)
-            if not hasattr(airfoil_tip, "CDCL_avl"): continue
+            pool = mp.Pool(processes=num_to_gen)
+            chroms = pool.map(self.generate_chromosome, headers)
+            [self.chroms.append(c) for c in chroms if c is not None]
 
-            chrom = Chromosome(airfoil_root, airfoil_tip, span, taper, AR, sweep, twist)
-            chrom.chrom_header = chrom_header
-            self.chroms.append(chrom)
+    def extract_inputs(self, chrom_header:dict) -> list:
+            
+        root, tip, span, taper, AR, sweep, twist = [None,None,None],\
+            [None,None,None],None,None,None,None,None
+        
+        for key in list(chrom_header.keys()) + list(self.constants.keys()):
+            if key in chrom_header.keys(): dict_=chrom_header 
+            if key in self.constants.keys(): dict_=self.constants
+            if key == "span":                   span = dict_[key]                
+            if key == "aspect ratio":           AR = dict_[key]       
+            if key == "taper":                  taper = dict_[key]              
+            if key == "sweep deg":              sweep = dict_[key]           
+            if key == "twist deg":              twist = dict_[key]           
+            if key == "root camber":            root[0] = dict_[key]         
+            if key == "root camber location":   root[1] = dict_[key]
+            if key == "root thickness":         root[2] = dict_[key]      
+            if key == "tip camber":             tip[0] = dict_[key]          
+            if key == "tip camber location":    tip[1] = dict_[key] 
+            if key == "tip thickness":          tip[2] = dict_[key]       
+        
+        return root, tip, span, taper, AR, sweep, twist
+    
+    def create_header(self, parents:list=None, mutate:bool=True) -> dict:
+        """
+        creates a header dictionary which can then be used to create a chromosome
+        """
+        header = {}
+        if parents is None: 
+            #generate header with random traits     
+            for key in self.variables.keys():
+                var = self.variables[key] 
+                header[key] = random.uniform(var[0], var[1])
+
+        else: 
+            #generate header by averaging parents traits
+            parent1, parent2 = parents[0], parents[1]
+            for i,_ in enumerate(parent1.chrom_header):
+                key = list(parent1.chrom_header.keys())[i]
+                header[key] = 0.5*(parent1.chrom_header[key] + parent2.chrom_header[key]) #averaged 
+
+        if mutate: 
+            if random.uniform(0,1) <= self.p_child_mut:
+                for key in header.keys(): 
+                
+                    if random.uniform(0,1) >= self.p_gene_mut: continue 
+                    mutation_factor = np.random.normal(loc=0, scale=1)
+                    header[key] *= 1 + mutation_factor
+
+                    upper_lim, lower_lim = self.variables[key][-1], self.variables[key][0]
+                    if header[key] < lower_lim: 
+                        header[key] = lower_lim
+                    elif header[key] > upper_lim:
+                        header[key] = upper_lim 
+
+        return header           
+
+    def generate_chromosome(self, child_chrom_header) -> object:
+        """
+        multiprocessing target function for creating new chromosomes
+        """
+        root, tip, span, taper, AR, sweep, twist = self.extract_inputs(child_chrom_header)
+
+        root_chord = 2*span/(AR*(1+taper))
+        Re_root = round(self.Re*root_chord, -5)
+        airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root)
+        if not hasattr(airfoil_root, "CDCL_avl"): return None
+            
+        tip_chord = taper*root_chord
+        Re_tip = round(self.Re*tip_chord, -5)
+        airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip)
+        if not hasattr(airfoil_tip, "CDCL_avl"): return None
+        
+        new_chrom = Chromosome(airfoil_root, airfoil_tip, span, taper, AR, sweep, twist)
+        new_chrom.chrom_header = child_chrom_header
+        return new_chrom
 
     def selection(self, k) -> None: 
         """
@@ -102,7 +140,7 @@ class Population:
         chroms_sorted = sorted(self.chroms, key=lambda c: c.fitness)
         self.chroms = chroms_sorted[k:]
 
-    def crossover_and_mutation(self, k, p_gene_mut, p_child_mut) -> None: 
+    def crossover_and_mutation(self, k) -> None: 
         """
         creates new chromosomes and mutates using interpolated mutations
         k: number of chromosomes to generate
@@ -111,73 +149,25 @@ class Population:
         p_child_mut: probability that a given child will experience mutation 
         """
 
-        def extract_inputs(chrom_header:dict, constants:dict):
-
-            root, tip, span, taper, AR, sweep, twist = [None,None,None],\
-                [None,None,None],None,None,None,None,None
-            
-            for key in list(chrom_header.keys()) + list(constants.keys()):
-                if key in chrom_header.keys(): dict_=chrom_header 
-                if key in constants.keys(): dict_=constants
-
-                if key == "span":                   span = dict_[key]                
-                if key == "aspect ratio":           AR = dict_[key]       
-                if key == "taper":                  taper = dict_[key]              
-                if key == "sweep deg":              sweep = dict_[key]           
-                if key == "twist deg":              twist = dict_[key]           
-                if key == "root camber":            root[0] = dict_[key]         
-                if key == "root camber location":   root[1] = dict_[key]
-                if key == "root thickness":         root[2] = dict_[key]      
-                if key == "tip camber":             tip[0] = dict_[key]          
-                if key == "tip camber location":    tip[1] = dict_[key] 
-                if key == "tip thickness":          tip[2] = dict_[key]       
-
-            return root, tip, span, taper, AR, sweep, twist
-
         new_chroms = []
         while len(new_chroms) < k: 
-
-            i1 = random.choice(range(len(self.chroms)))
-            i2 = i1
-            while i2 == i1: 
-                i2 = random.choice(range(len(self.chroms)))
-
-            parent1, parent2 = self.chroms[i1], self.chroms[i2]
-            child_chrom_header = {}
-            for i,_ in enumerate(parent1.chrom_header):
-                key = list(parent1.chrom_header.keys())[i]
-                child_chrom_header[key] = 0.5*(parent1.chrom_header[key] + parent2.chrom_header[key]) #averaged 
             
-            #apply mutations to child_chrom_header
-            if random.uniform(0,1) <= p_child_mut:
-                
-                for key in child_chrom_header.keys(): 
-                    
-                    if random.uniform(0,1) >= p_gene_mut: continue 
-                    mutation_factor = np.random.normal(loc=0, scale=1)
-                    child_chrom_header[key] *= 1 + mutation_factor
-                    
-                    upper_lim, lower_lim = self.variables[key][-1], self.variables[key][0]
-                    if child_chrom_header[key] < lower_lim: 
-                        child_chrom_header[key] = lower_lim
-                    elif child_chrom_header[key] > upper_lim:
-                        child_chrom_header[key] = upper_lim  
+            num_to_gen = k - len(new_chroms)
+            if mp.cpu_count() < num_to_gen:
+                num_to_gen = mp.cpu_count()
 
-            root, tip, span, taper, AR, sweep, twist = extract_inputs(child_chrom_header, self.constants)
-
-            root_chord = 2*span/(AR*(1+taper))
-            Re_root = round(self.Re*root_chord, -5)
-            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root)
-            if not hasattr(airfoil_root, "CDCL_avl"): continue
-             
-            tip_chord = taper*root_chord
-            Re_tip = round(self.Re*tip_chord, -5)
-            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip)
-            if not hasattr(airfoil_tip, "CDCL_avl"): continue
+            headers = []    
+            for _ in range(num_to_gen):
+                i1 = random.choice(range(len(self.chroms)))
+                i2 = i1
+                while i2 == i1: 
+                    i2 = random.choice(range(len(self.chroms)))
+                parents = [self.chroms[i1], self.chroms[i2]]
+                headers.append(self.create_header(parents))
             
-            new_chrom = Chromosome(airfoil_root, airfoil_tip, span, taper, AR, sweep, twist)
-            new_chrom.chrom_header = child_chrom_header
-            new_chroms.append(new_chrom)
+            pool = mp.Pool(processes=num_to_gen)
+            chroms = pool.map(self.generate_chromosome, headers)
+            [new_chroms.append(c) for c in chroms if c is not None]
 
         [self.chroms.append(chrom) for chrom in new_chroms] #add children to population 
 
@@ -188,7 +178,6 @@ class Population:
         chroms_sorted = sorted(self.chroms, key=lambda c: c.fitness)
         self.best_chrom = chroms_sorted[-1]
         self.best_chrom_fitness.append(self.best_chrom.fitness) 
-
 
 class Chromosome(wing.Wing):
     """
@@ -218,9 +207,6 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
     if live_plot: 
         import matplotlib.pyplot as plt
         fig, axs = initialize_plot()
-      
-    #open airfoil history file
-    airfoil_hist = None 
 
     #intialize population of m individuals
     popSize = study_parameters["population size"]
@@ -230,8 +216,11 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
     
     p_gene_mut, p_child_mut = study_parameters["gene mutation probability"],\
                                 study_parameters["child mutation probability"]
+    
     population = Population(size=popSize, wing_parameters=wing_parameters,\
-                            seed_wing=seed_wing)  
+                            mutation_probs=[p_child_mut, p_gene_mut],\
+                                seed_wing=seed_wing)  
+    
     [chrom.evaluate_fitness(fitness_function) for chrom in population.chroms]
     population.get_best_chrom()
     nIter = study_parameters["number of gens"]
@@ -245,7 +234,7 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
 
         prev_best = population.best_chrom
         population.selection(k) #kill off worst performing chromosomes
-        population.crossover_and_mutation(k, p_gene_mut, p_child_mut) #generate new children 
+        population.crossover_and_mutation(k) #generate new children 
         [chrom.evaluate_fitness(fitness_function) for chrom in population.chroms] #evaluate fitness 
         population.get_best_chrom()
         n += 1  
@@ -352,3 +341,4 @@ def get_reynolds_number(h:float , V:float, units:str, l:float=1) -> float:
         return get_reynolds_number_US(h, V, l)
     else: 
         raise ValueError("unknown units")
+    

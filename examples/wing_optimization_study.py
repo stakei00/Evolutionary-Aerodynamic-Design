@@ -34,8 +34,8 @@ wing_parameters = {
 
 study_parameters = {
     #defines genetic algorithm study settings
-    "population size":              10, 
-    "children per generation":      5, #number of new chromosomes per generation (< population size)
+    "population size":              4, 
+    "children per generation":      2, #number of new chromosomes per generation (< population size)
     "gene mutation probability":    0.125, #probability that a gene will mutate 
     "child mutation probability":   0.5, #probabilty that child will have mutation(s)
     "number of gens":               400 #number of generations/iterations for study 
@@ -67,10 +67,11 @@ def fitness(wing:object):
     return max(lift_to_drag)
 
 #optimization function call 
-optimized_wing = evo.optimize(wing_parameters=wing_parameters, \
-                    study_parameters=study_parameters,\
-                        fitness_function=fitness,\
-                            seed_wing=None,\
-                                live_plot=True)
-optimized_wing.plot_avl_xfoil_results()
-optimized_wing.export_wing()
+if __name__ == "__main__": 
+    optimized_wing = evo.optimize(wing_parameters=wing_parameters, \
+                        study_parameters=study_parameters,\
+                            fitness_function=fitness,\
+                                seed_wing=None,\
+                                    live_plot=True)
+    optimized_wing.plot_avl_xfoil_results()
+    optimized_wing.export_wing()

@@ -78,9 +78,14 @@ class Airfoil:
         import subprocess
         import os
         import time
+        import random 
 
-        if os.path.exists("polar_file.txt"):
-            os.remove("polar_file.txt")
+        #generate unique file name for polar data 
+        while True: 
+            polar_tag = str(int(random.uniform(0, 100000)))
+            polar_file = f"polar_{polar_tag}.txt"
+            if not os.path.exists(polar_file):
+                break 
 
         input_content = "PLOP\n" +\
             "G F\n" +\
@@ -93,7 +98,7 @@ class Airfoil:
             f"{ncrit}\n\n" +\
             f"Visc {Re}\n" +\
             "PACC\n" +\
-            "polar_file.txt\n\n" +\
+            f"{polar_file}\n\n" +\
             f"ITER {n_iter}\n" +\
             f"ASeq {alpha_i} {alpha_f} {alpha_step}\n" +\
             "\n\n" +\
@@ -118,7 +123,10 @@ class Airfoil:
             process.terminate()
 
         try: 
-            return np.loadtxt("polar_file.txt", skiprows=12)
+            polar = np.loadtxt(polar_file, skiprows=12)
+            os.remove(polar_file)
+            return polar 
+        
         except: 
             return None
         
