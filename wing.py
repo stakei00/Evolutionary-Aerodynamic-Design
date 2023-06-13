@@ -3,22 +3,22 @@ import numpy as np
 
 class Wing: 
 
-    def __init__(self, airfoil_root: object, airfoil_tip: object, span: float, \
+    def __init__(self, airfoil_root: object, airfoil_tip: object, \
                 taper_ratio:float, aspect_ratio:float, sweep_deg: float, \
                     twist_deg:float) -> None: 
         """
         """
         self.airfoil_root = airfoil_root
         self.airfoil_tip = airfoil_tip
+        self.Re_c = airfoil_root.Re #reynolds # to root chord ratio 
         self.tip_twist_deg = twist_deg
         self.sweep_deg = sweep_deg
         self.AR = aspect_ratio
         self.taper = taper_ratio
-        self.span = span
-
-        self.area = self.span**2/self.AR
-        self.root_chord = 2*self.area/(self.span*(1 + self.taper))
+        self.root_chord = 1
         self.tip_chord = self.taper*self.root_chord
+        self.span = self.AR*(self.root_chord+self.tip_chord)/2
+        self.area = self.span**2/self.AR
         self.mean_aero_chord = 2*self.root_chord*((self.taper**2 + self.taper +\
                                                     1)/(self.taper + 1))/3
 
@@ -117,6 +117,9 @@ class Wing:
                             -self.x_t,-self.x_t, 0]
         ax.plot(horz_ax_data, vert_ax_data, color=linecolor, linewidth=1)
         ax.plot([-1*x for x in horz_ax_data], vert_ax_data, color=linecolor, linewidth=1)
+        ax.plot([-self.span/2, 0, self.span/2],[-self.x_t-self.tip_chord/4,\
+                        -self.root_chord/4, -self.x_t-self.tip_chord/4],\
+                            color=linecolor, linewidth=0.75, linestyle="dashed")
         #ax.fill(horz_ax_data, vert_ax_data, facecolor="aliceblue")
         #ax.fill([-1*x for x in horz_ax_data], vert_ax_data, facecolor="aliceblue")
         ax.set_aspect("equal", adjustable="box")

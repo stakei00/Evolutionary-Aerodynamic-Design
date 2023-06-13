@@ -1,4 +1,5 @@
-import numpy as np 
+import numpy as np
+from scipy.interpolate import interp1d 
 import math 
 import pickle
 import os
@@ -22,7 +23,7 @@ class Airfoil:
         self.Re = int(round(Re, -5))
         
         #create equivalent NACA 4-digit designation
-        if round(m*100, 0) < 1: 
+        if round(m*100, 0) < 1 or round(p*10,0) < 1: 
             self.NACA_4series_desig = "00"
         else: 
             self.NACA_4series_desig = str(int(10*round(m*100, 0) + round(p*10, 0)))
@@ -57,10 +58,10 @@ class Airfoil:
             if np.size(xfoil_data_neg) > 7:
                 xfoil_data_neg = np.flipud(xfoil_data_neg)
             xfoil_data = np.concatenate((xfoil_data_neg, xfoil_data_pos))
-            self.alpha = xfoil_data[:,0]
-            self.lift_coefficient = xfoil_data[:,1]
-            self.drag_coefficient = xfoil_data[:,2]
-            self.moment_coefficient = xfoil_data[:,4]
+            self.alpha_raw = xfoil_data[:,0]
+            self.lift_coefficient_raw = xfoil_data[:,1]
+            self.drag_coefficient_raw = xfoil_data[:,2]
+            self.moment_coefficient_raw = xfoil_data[:,4]
         except: 
             return
 
@@ -134,21 +135,62 @@ class Airfoil:
         """
         Gets 3 points on CLCD drag polar for use with AVL
         """
-        alpha_interp = np.linspace(min(self.alpha), max(self.alpha), 200)
-        cl_interp = np.interp(alpha_interp, self.alpha, self.lift_coefficient)
-        cl_max_ind = np.argmax(cl_interp)
-        cl_min_ind = np.argmin(cl_interp)
+        alpha_interp = np.linspace(min(self.alpha_raw), max(self.alpha_raw), 200)
+        cl_interp_func = interp1d(self.alpha_raw, self.lift_coefficient_raw, kind="quadratic")
+        cl_interp = np.array([cl_interp_func(a) for a in alpha_interp])
+        dcl_dalpha = np.gradient(cl_interp, alpha_interp[1]-alpha_interp[0]) #lift slope
+
+        #get index of first angle of attack >= 0: 
+        ind_alpha0 = len(alpha_interp)/2
+        for i,a in enumerate(alpha_interp[1:]):
+            if a >= 0 and alpha_interp[i-1] < 0:
+                ind_alpha0 = i
+
+        baseline_lift_slope = dcl_dalpha[ind_alpha0]
+
+        #find max lift coefficient
+        cl_max_ind = None
+        for i,a in enumerate(alpha_interp[:-1]):
+            if a < 0: continue 
+            if dcl_dalpha[i] < 0.1*baseline_lift_slope: 
+                cl_max_ind = i-1
+                break
+            #if dcl_dalpha[i]*dcl_dalpha[i+1] < 0: 
+            #    cl_max_ind = i-1
+            #    break
+
+        if cl_max_ind is None: #if unable to find CL max, abort
+            return 
+        self.max_lift_coefficient = cl_interp[cl_max_ind]
         
+        #try to find min lift coefficient
+        cl_interp_flip = np.flip(cl_interp)
+        cl_min_ind = np.argmin(cl_interp_flip)
+        alpha_interp_flip = np.flip(alpha_interp)
+        dcl_dalpha_flip = np.flip(dcl_dalpha)
+        
+        for i,a in enumerate(alpha_interp_flip[:-1]):
+            if a > 0: continue 
+            if dcl_dalpha_flip[i] < 0.1*baseline_lift_slope: 
+                cl_min_ind = i-1
+                self.min_lift_coefficient = cl_interp[len(cl_interp)-1-cl_min_ind]
+                break
+            #if dcl_dalpha_flip[i]*dcl_dalpha_flip[i+1] < 0: 
+            #    cl_min_ind = i-1
+            #    break
+                
+        cl_min_ind = len(cl_interp) - 1 - cl_min_ind
+
         #trim alpha, cl, cd arrays 
         alpha_new, cl_new, cd_new, cm_new = [],[],[],[]
-        for i,a in enumerate(self.alpha):
+        for i,a in enumerate(self.alpha_raw):
             if a < alpha_interp[cl_min_ind]: continue
-            if a > alpha_interp[cl_max_ind]: continue
+            if a > alpha_interp[cl_max_ind]: break
 
             alpha_new.append(a)
-            cm_new.append(self.moment_coefficient[i])
-            cl_new.append(self.lift_coefficient[i])
-            cd_new.append(self.drag_coefficient[i]) 
+            cm_new.append(self.moment_coefficient_raw[i])
+            cl_new.append(self.lift_coefficient_raw[i])
+            cd_new.append(self.drag_coefficient_raw[i]) 
 
         #update attribute arrays 
         self.alpha = alpha_new 
@@ -158,17 +200,19 @@ class Airfoil:
 
         #interpolate drag coefficient
         if len(self.lift_coefficient) < 2: 
-            return 
-        cd_interp = np.interp(cl_interp, self.lift_coefficient, self.drag_coefficient)
+            return
+        
+        cl_interp = np.array([cl_interp_func(a) for a in alpha_interp[cl_min_ind:cl_max_ind+1]])
+        cd_interp_func = interp1d(self.lift_coefficient, self.drag_coefficient, kind="linear", bounds_error=False, fill_value="extrapolate")
+        cd_interp = np.array([cd_interp_func(cl) for cl in cl_interp])
         cd_min_ind = np.argmin(cd_interp)
 
         #pack up everything and add as object attribute
-        cl1, cd1 = cl_interp[cl_min_ind], cd_interp[cl_min_ind]
+        cl1, cd1 = cl_interp[0], cd_interp[0]
         cl2, cd2 = cl_interp[cd_min_ind], cd_interp[cd_min_ind]
-        cl3, cd3 = cl_interp[cl_max_ind], cd_interp[cl_max_ind]
+        cl3, cd3 = cl_interp[-1], cd_interp[-1]
 
         self.CDCL_avl = [cl1, cd1, cl2, cd2, cl3, cd3]
-        self.max_lift_coefficient = cl_interp[cl_max_ind] 
 
     def plot_airfoil(self, ax, chord_scale:float=None, origin:tuple or list=None,\
                       twist_deg:float=None, linecolor:str="black") -> None:
@@ -232,23 +276,95 @@ class Airfoil:
         with open(f"airfoils/n{self.NACA_4series_desig}_{self.Re}", "wb") as file:
             pickle.dump(self, file)
 
+class Airfoil_Interpolator:
+    """
+    airfoil data interpreter. Currently designed for naca 4 digit airfoils with 
+    independent parameters: (m,p,t,Re)
+    """ 
+
+    def __init__(self, batch_data_file:str):
+        
+        self.batch_data_file_path = batch_data_file
+        #load batch data 
+        self.load_batch_data()
+        #create interpolator from batch data
+        self.create_interpolator()
+
+    def load_batch_data(self) -> None:
+        
+        import json
+        self.batch_data = json.load(open(self.batch_data_file_path, "r"))
+        
+        #create point range
+        m_list, p_list, t_list, re_list = [],[],[],[]
+        for case in self.batch_data["cases"]: 
+            #get m,p,t from airfoil naca digits
+            m_list.append(case[0])
+            p_list.append(case[1])
+            t_list.append(case[2])
+            re_list.append(case[3])
+
+        #get rid of duplicate values 
+        m_list = [*set(m_list)]
+        p_list = [*set(p_list)]
+        t_list = [*set(t_list)]
+        re_list = [*set(re_list)]
+
+        #sort lists to get ranges
+        m_list.sort()
+        p_list.sort() 
+        t_list.sort() 
+        re_list.sort() 
+
+        points = (m_list, p_list, t_list, re_list)
+        values = np.zeros((len(m_list), len(p_list), len(t_list), len(re_list), 7)) 
+
+        for i,m in enumerate(m_list):
+            for j,p in enumerate(p_list): 
+                for k,t in enumerate(t_list): 
+                    for l,re in enumerate(re_list): 
+                        
+                        naca4 = str(int(10*round(m*100, 0) + round(p*10, 0)))
+                        if round(m*100, 0) < 1: 
+                            naca4 = "00"
+                        if round(t*100,0) < 10: 
+                            naca4 += "0"
+                        naca4 += str(int(round(t*100, 0)))
+
+                        key = naca4+"_"+str(int(re))
+
+                        if key not in list(self.batch_data.keys()):
+                            values[i,j,k,l] = 7*[math.nan]
+                        else: 
+                            data = self.batch_data[key]
+                            for ii,val in enumerate(data):
+                                if val == "None": 
+                                    data[ii] = math.nan 
+                                    break
+
+                            values[i,j,k,l] = [data[0],data[2][0],\
+                                               data[2][1],data[2][2],\
+                                                data[2][3],data[2][4],data[2][5]]
+                         
+        self.points = points 
+        self.values = values 
+
+    def create_interpolator(self):
+
+        import scipy.interpolate as sci_int
+
+        self.interpolator = sci_int.RegularGridInterpolator(self.points,\
+                                self.values, bounds_error=False,\
+                                    fill_value=None)
 
 if __name__ == "__main__":
-    m = 0.05
-    p = 0.2
-    t = 0.06
-    re = 10e6
+    
+    #testing out airfoil interpolator
+    interpolator = Airfoil_Interpolator("xfoil_batch_data.json")
 
-    af = Airfoil(m,p,t,re,search_airfoils=False)
+    test = interpolator.interpolator([0.04, 0.2, 0.12, 300000])
+    print("airfoil NACA4412 at Re=300000")
+    print(f"CDCL input: {test[0][1:]}")
+    print(f"CL max: {test[0][0]}")
 
-    import matplotlib.pyplot as plt 
-    plt.figure()
-    plt.plot(af.alpha, af.lift_coefficient)
-    plt.grid() 
-    plt.xlabel("alpha (deg)"), plt.ylabel("C_l")
-    plt.figure()
-    plt.plot(af.drag_coefficient, af.lift_coefficient)
-    plt.grid()
-    plt.xlabel("C_d"), plt.ylabel("C_l")
-    plt.show() 
-    pass
+    pass 
