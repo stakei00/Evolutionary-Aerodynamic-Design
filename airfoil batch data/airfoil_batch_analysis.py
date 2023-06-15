@@ -1,3 +1,5 @@
+import sys, os 
+sys.path.append(os.getcwd())
 import airfoil
 import matplotlib.pyplot as plt
 import json
@@ -83,7 +85,7 @@ if __name__ == "__main__":
     
     af_dicts = []
     count = 1
-    tot_count = 500
+    tot_count = 500 #! number of iterations to run through
     while count < tot_count: 
         
         print(f"\tsolving airfoil: {count}/{tot_count}")

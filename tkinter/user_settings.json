@@ -1,0 +1,36 @@
+{
+    "optimizer settings": {
+        "population size": 12, 
+        "children per generation": 6, 
+        "gene mutation probability": 0.125, 
+        "child mutation probability": 0.5, 
+        "number of gens": 100
+    }, 
+        
+    "wing parameters": {
+        "aspect ratio": 10, 
+        "taper": [0.3, 1], 
+        "sweep deg": 0, 
+        "twist deg": [-5, 5], 
+        "root camber": [0, 0.06], 
+        "root camber location": [0.2, 0.6], 
+        "root thickness": [0.08, 0.2], 
+        "tip camber": [0, 0.06], 
+        "tip camber location": [0.2, 0.6], 
+        "tip thickness": [0.08, 0.3], 
+        "Re/chord": 500000
+    }, 
+    
+    "xfoil settings": {
+        "exe path": "C:/Users/Shays/Documents/GitHub/Evolutionary-Aerodynamic-Design/xfoil.exe",
+        "iter": 500, 
+        "aseq": [-24, 24, 1], 
+        "Ncrit": 9
+    }, 
+    "avl settings": {
+        "exe path": "C:/Program Files/OpenVSP-3.33.1-win64/python/AvlPy/avlpy/avl.exe",
+        "Nchord": 10, 
+        "Nspan": 12, 
+        "aseq": [-24, 24, 1]
+    }
+}

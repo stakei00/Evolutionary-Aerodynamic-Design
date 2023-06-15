@@ -1,6 +1,6 @@
 # Overview
 
-To set up a python environment which will allow you to run evolutionary wing 
+To set up a python environment which will allow you to run genetic wing 
 optimizations, you will need to configure your python environment to a few 
 specific requirements. For the purpose of this tutorial I will be using Anaconda
 as my package manager, though virtual environments should also work here. I have
@@ -14,7 +14,7 @@ also only tested this with Windows 64-bit.
 2.  Go to OpenVSP's download page (https://openvsp.org/download.php) and download
     OpenVSP 64-bit Python 3.9 (I have been using version 3.34.0).
 
-3.  extract the contents of the downloaded folder and put them somewhere safe. I 
+3.  extract the contents of the downloaded .zip folder and put them somewhere safe. I 
     put mine in C:/Program Files
 
 4.  Open anaconda prompt and change your directory to ...\OpenVSP-3.33.1-win64\python
@@ -36,7 +36,7 @@ also only tested this with Windows 64-bit.
     and place xfoil.exe inside this repository alongside wing_optimization_study.py
 
 10. finally, make sure you have the standard packages in your environment: 
-    matplotlib, numpy, pickle, subprocess, os. You may have to conda/pip install 
+    matplotlib, numpy, pickle, subprocess, multiprocessing. You may have to conda/pip install 
     some of these if they're not in your environment already
 
-If you have any questions, contact me @ shaystakei@gmail.com 
+If you have any questions, contact me at shaystakei@gmail.com 

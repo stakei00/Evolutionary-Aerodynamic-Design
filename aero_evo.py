@@ -43,8 +43,8 @@ class Population:
         while len(self.chroms) < size:
             
             num_to_gen = size - len(self.chroms)
-            if mp.cpu_count() < num_to_gen:
-                num_to_gen = mp.cpu_count()
+            if mp.cpu_count()-1 < num_to_gen:
+                num_to_gen = mp.cpu_count()-1
 
             if seed_wing is not None: 
                 headers = [seed_chrom_header for _ in range(num_to_gen)]
@@ -153,8 +153,8 @@ class Population:
         while len(new_chroms) < k: 
             
             num_to_gen = k - len(new_chroms)
-            if mp.cpu_count() < num_to_gen:
-                num_to_gen = mp.cpu_count()
+            if mp.cpu_count()-1 < num_to_gen:
+                num_to_gen = mp.cpu_count()-1
 
             headers = []    
             for _ in range(num_to_gen):
@@ -261,7 +261,7 @@ def initialize_plot():
         plt.ion()
         plt.style.use("dark_background")
         matplotlib.rcParams["toolbar"] = "None" #hide the toolbar
-        fig = plt.figure(figsize=(16,8))
+        fig = plt.figure(figsize=(10,4))
         fig.canvas.manager.set_window_title("live plot")
         fig.suptitle("G-WING Live Plot", fontweight="bold", color="limegreen")
         gs = fig.add_gridspec(3,4)

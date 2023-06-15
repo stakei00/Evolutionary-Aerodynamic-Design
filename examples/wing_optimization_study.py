@@ -33,8 +33,8 @@ wing_parameters = {
 
 study_parameters = {
     #defines genetic algorithm study settings
-    "population size":              4, 
-    "children per generation":      2, #number of new chromosomes per generation (< population size)
+    "population size":              12, 
+    "children per generation":      6, #number of new chromosomes per generation (< population size)
     "gene mutation probability":    0.125, #probability that a gene will mutate 
     "child mutation probability":   0.5, #probabilty that child will have mutation(s)
     "number of gens":               400 #number of generations/iterations for study 
