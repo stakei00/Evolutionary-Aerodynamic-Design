@@ -3,6 +3,7 @@ import random
 import airfoil
 import numpy as np
 import multiprocessing as mp
+import math 
 import time
 import os 
 
@@ -10,7 +11,8 @@ class Population:
     """
     creates and manipulates population
     """
-    def __init__(self, size:int, wing_parameters:dict, mutation_probs:list, seed_wing:dict=None) -> None: 
+    def __init__(self, size:int, wing_parameters:dict, mutation_probs:list, 
+                 seed_wing:dict=None, multiproc:bool=True) -> None: 
         """
         initializes population of chromosomes
         Inputs: 
@@ -21,8 +23,10 @@ class Population:
         """
         self.chroms = []
         self.best_chrom_fitness = []
+        self.best_chrom_history = []
         self.p_gene_mut = mutation_probs[1]
         self.p_child_mut = mutation_probs[0]
+        self.multiproc = multiproc
         
         #separate constants from variables 
         self.variables = {} #variables and limits
@@ -42,18 +46,29 @@ class Population:
 
         while len(self.chroms) < size:
             
-            num_to_gen = size - len(self.chroms)
-            if mp.cpu_count()-1 < num_to_gen:
-                num_to_gen = mp.cpu_count()-1
+            if self.multiproc: 
+                num_to_gen = size - len(self.chroms)
+                if math.ceil(mp.cpu_count()/2) < num_to_gen:
+                    num_to_gen = math.ceil(mp.cpu_count()/2)
 
-            if seed_wing is not None: 
-                headers = [seed_chrom_header for _ in range(num_to_gen)]
+                if seed_wing is not None: 
+                    headers = [seed_chrom_header for _ in range(num_to_gen)]
+                else: 
+                    headers = [self.create_header(mutate=False) for _ in range(num_to_gen)]
+
+                pool = mp.Pool(processes=num_to_gen)
+                chroms = pool.map(self.generate_chromosome, headers)
+                [self.chroms.append(c) for c in chroms if c is not None]
+
             else: 
-                headers = [self.create_header(mutate=False) for _ in range(num_to_gen)]
-
-            pool = mp.Pool(processes=num_to_gen)
-            chroms = pool.map(self.generate_chromosome, headers)
-            [self.chroms.append(c) for c in chroms if c is not None]
+                if seed_wing is not None: 
+                    header = seed_chrom_header
+                else: 
+                    header = self.create_header(mutate=False)
+                chrom = self.generate_chromosome(header)
+                
+                if chrom is not None: 
+                    self.chroms.append(chrom)
 
     def extract_inputs(self, chrom_header:dict) -> list:
             
@@ -115,21 +130,25 @@ class Population:
         """
         multiprocessing target function for creating new chromosomes
         """
-        root, tip, taper, AR, sweep, twist, re_c = self.extract_inputs(child_chrom_header)
-
-        root_chord = 1
-        Re_root = round(re_c*root_chord, -5)
-        airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root)
-        if not hasattr(airfoil_root, "alpha"): return None
-            
-        tip_chord = taper*root_chord
-        Re_tip = round(re_c*tip_chord, -5)
-        airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip)
-        if not hasattr(airfoil_tip, "alpha"): return None
         
-        new_chrom = Chromosome(airfoil_root, airfoil_tip, taper, AR, sweep, twist)
-        new_chrom.chrom_header = child_chrom_header
-        return new_chrom
+        try:
+            root, tip, taper, AR, sweep, twist, re_c = self.extract_inputs(child_chrom_header)
+            root_chord = 1
+            Re_root = round(re_c*root_chord, -5)
+            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root)
+            if not hasattr(airfoil_root, "alpha"): return None
+
+            tip_chord = taper*root_chord
+            Re_tip = round(re_c*tip_chord, -5)
+            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip)
+            if not hasattr(airfoil_tip, "alpha"): return None
+
+            new_chrom = Chromosome(airfoil_root, airfoil_tip, taper, AR, sweep, twist)
+            new_chrom.chrom_header = child_chrom_header
+            return new_chrom
+        
+        except: 
+            return None
 
     def selection(self, k) -> None: 
         """
@@ -152,22 +171,34 @@ class Population:
         new_chroms = []
         while len(new_chroms) < k: 
             
-            num_to_gen = k - len(new_chroms)
-            if mp.cpu_count()-1 < num_to_gen:
-                num_to_gen = mp.cpu_count()-1
+            if self.multiproc: 
+                num_to_gen = k - len(new_chroms)
+                if math.ceil(mp.cpu_count()/2) < num_to_gen:
+                    num_to_gen = math.ceil(mp.cpu_count()/2)
 
-            headers = []    
-            for _ in range(num_to_gen):
+                headers = []    
+                for _ in range(num_to_gen):
+                    i1 = random.choice(range(len(self.chroms)))
+                    i2 = i1
+                    while i2 == i1: 
+                        i2 = random.choice(range(len(self.chroms)))
+                    parents = [self.chroms[i1], self.chroms[i2]]
+                    headers.append(self.create_header(parents))
+
+                pool = mp.Pool(processes=num_to_gen)
+                chroms = pool.map(self.generate_chromosome, headers)
+                [new_chroms.append(c) for c in chroms if c is not None]
+
+            else: 
                 i1 = random.choice(range(len(self.chroms)))
                 i2 = i1
                 while i2 == i1: 
                     i2 = random.choice(range(len(self.chroms)))
                 parents = [self.chroms[i1], self.chroms[i2]]
-                headers.append(self.create_header(parents))
-            
-            pool = mp.Pool(processes=num_to_gen)
-            chroms = pool.map(self.generate_chromosome, headers)
-            [new_chroms.append(c) for c in chroms if c is not None]
+                header = self.create_header(parents)
+                chrom = self.generate_chromosome(header)
+                if chrom is not None: 
+                    new_chroms.append(chrom)
 
         [self.chroms.append(chrom) for chrom in new_chroms] #add children to population 
 
@@ -177,6 +208,10 @@ class Population:
         """
         chroms_sorted = sorted(self.chroms, key=lambda c: c.fitness)
         self.best_chrom = chroms_sorted[-1]
+        
+        if self.best_chrom not in self.best_chrom_history:
+            self.best_chrom_history.append(self.best_chrom)
+
         self.best_chrom_fitness.append(self.best_chrom.fitness) 
 
 class Chromosome(wing.Wing):
@@ -199,7 +234,7 @@ class Chromosome(wing.Wing):
 
 
 def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
-             seed_wing:dict=None,live_plot=False) -> object:
+             seed_wing:dict=None,live_plot=False, multiproc=True) -> object:
     """
     Runs genetic algorithm study
     """
@@ -224,7 +259,7 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
     #create population 
     population = Population(size=popSize, wing_parameters=wing_parameters,\
                             mutation_probs=[p_child_mut, p_gene_mut],\
-                                seed_wing=seed_wing)  
+                                seed_wing=seed_wing, multiproc=multiproc)  
     
     #evaluate fitness of initial population 
     [chrom.evaluate_fitness(fitness_function) for chrom in population.chroms]
@@ -232,6 +267,7 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
 
     nIter = study_parameters["number of gens"]
     prev_best = population.best_chrom
+    
     n = 0  
     while n < nIter:
         #run genetic algorithm:
@@ -244,7 +280,7 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
         [chrom.evaluate_fitness(fitness_function) for chrom in population.chroms] #evaluate fitness 
         population.get_best_chrom()
         n += 1  
-    
+
     if live_plot: 
         update_plot(fig, axs, population, prev_best, "finished", time0=t_start)
         plt.ioff()
@@ -259,11 +295,11 @@ def initialize_plot():
         import matplotlib
         import matplotlib.pyplot as plt
         plt.ion()
-        plt.style.use("dark_background")
+        #plt.style.use("dark_background")
         matplotlib.rcParams["toolbar"] = "None" #hide the toolbar
-        fig = plt.figure(figsize=(10,4))
+        fig = plt.figure(figsize=(12,6))
         fig.canvas.manager.set_window_title("live plot")
-        fig.suptitle("G-WING Live Plot", fontweight="bold", color="limegreen")
+        fig.suptitle("G-WING Live Plot", fontweight="bold")
         gs = fig.add_gridspec(3,4)
 
         ax1 = fig.add_subplot(gs[0,:3])
@@ -281,7 +317,7 @@ def initialize_plot():
         ax4 = fig.add_subplot(gs[:2,3])
         ax4.set_xlim(0,1), ax4.set_ylim(0,1)
         ax4.spines[:].set_color("dimgrey")
-        
+                
         return fig, [ax1, ax2, ax3, ax4]
 
 
@@ -291,12 +327,12 @@ def update_plot(fig, axs, population, prev_best_chrom, status_msg, time0=None,):
 
     best_wing = population.best_chrom
     prev_best_chrom.plot_wing_planform(ax1, linecolor="dimgrey")
-    best_wing.plot_wing_planform(ax1, linecolor="white")
+    best_wing.plot_wing_planform(ax1, linecolor="black")
     prev_best_chrom.plot_wing_airfoils(ax2, linecolor="dimgrey")
-    best_wing.plot_wing_airfoils(ax2, linecolor="white")
+    best_wing.plot_wing_airfoils(ax2, linecolor="black")
     
     n = len(population.best_chrom_fitness)
-    ax3.plot(range(n),population.best_chrom_fitness, "-o", color="limegreen",\
+    ax3.plot(range(n),population.best_chrom_fitness, "-o", color="red",\
              linewidth=0.5, markersize=3)
     
     text =  f"status: {status_msg}\n"
@@ -320,7 +356,7 @@ def update_plot(fig, axs, population, prev_best_chrom, status_msg, time0=None,):
                 
     ax4.invert_yaxis()
     ax4.set_xticks([]), ax4.set_yticks([])
-    ax4.text(0.05, 0.03, text, fontsize=10, ha="left", va="top", color="limegreen")
+    ax4.text(0.05, 0.03, text, fontsize=10, ha="left", va="top", color="black")
     fig.canvas.draw()
     fig.canvas.flush_events()
 

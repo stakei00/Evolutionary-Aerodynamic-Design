@@ -1,0 +1,28 @@
+{
+    "optimizer settings":{
+        "population size": 6, 
+        "children per generation": 3,
+        "gene mutation probability": 0.125,
+        "child mutation probability": 0.5,
+        "number of gens": 100
+    },
+    "wing parameters":{
+        "aspect ratio": 10,
+        "taper": [0.3, 1],
+        "sweep deg": 0,
+        "twist deg": [-5, 5],
+        "root camber": [0, 0.06],
+        "root camber location": [0,0.6],
+        "root thickness":[0.08, 0.24],
+        "tip camber": [0, 0.06],
+        "tip camber location": [0,0.6],
+        "tip thickness": [0.08, 0.24],
+        "Re/chord": 500000
+    },
+    "xfoil settings":{
+
+    },
+    "avl settings":{
+
+    }
+}
