@@ -1,5 +1,6 @@
 {
     "optimizer settings":{
+        "fitness func": "max L/D",
         "population size": 6, 
         "children per generation": 3,
         "gene mutation probability": 0.125,
