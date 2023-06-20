@@ -115,27 +115,31 @@ class Wing:
         vert_ax_data = [0, -self.root_chord,-self.root_chord, \
                         -self.x_t-self.tip_chord,-self.x_t-self.tip_chord, \
                             -self.x_t,-self.x_t, 0]
-        ax.plot(horz_ax_data, vert_ax_data, color=linecolor, linewidth=1)
-        ax.plot([-1*x for x in horz_ax_data], vert_ax_data, color=linecolor, linewidth=1)
-        ax.plot([-self.span/2, 0, self.span/2],[-self.x_t-self.tip_chord/4,\
+        
+        line1, = ax.plot(horz_ax_data, vert_ax_data, color=linecolor, linewidth=1)
+        line2, = ax.plot([-1*x for x in horz_ax_data], vert_ax_data, color=linecolor, linewidth=1)
+        line3, = ax.plot([-self.span/2, 0, self.span/2],[-self.x_t-self.tip_chord/4,\
                         -self.root_chord/4, -self.x_t-self.tip_chord/4],\
                             color=linecolor, linewidth=0.75, linestyle="dashed")
         #ax.fill(horz_ax_data, vert_ax_data, facecolor="aliceblue")
         #ax.fill([-1*x for x in horz_ax_data], vert_ax_data, facecolor="aliceblue")
+
         ax.set_aspect("equal", adjustable="box")
+        return [line1, line2, line3]
 
     def plot_wing_airfoils(self, ax, linecolor:str="grey") -> None:
         """
         
         """
-        self.airfoil_root.plot_airfoil(ax, chord_scale=self.root_chord, \
+        line1 = self.airfoil_root.plot_airfoil(ax, chord_scale=self.root_chord, \
                                        linecolor=linecolor)
-        self.airfoil_tip.plot_airfoil(ax, chord_scale=self.tip_chord, \
+        line2 = self.airfoil_tip.plot_airfoil(ax, chord_scale=self.tip_chord, \
                                 twist_deg=self.tip_twist_deg, \
                                     origin=(-self.x_t,0), linecolor=linecolor)
         
         ax.set_aspect("equal", adjustable="box")
-
+        return [line1, line2]
+    
     def plot_avl_xfoil_results(self) -> None: 
         """
         creates a figure with several subplots showing results from AVL and xfoil 

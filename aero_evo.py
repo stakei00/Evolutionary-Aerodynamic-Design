@@ -241,7 +241,7 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
     t_start = time.time()/60
     if live_plot: 
         import matplotlib.pyplot as plt
-        fig, axs = initialize_plot()
+        fig, axs = initialize_3figplot()
 
     #intialize population of m individuals
     popSize = study_parameters["population size"]
@@ -271,7 +271,7 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
     n = 0  
     while n < nIter:
         #run genetic algorithm:
-        if live_plot: update_plot(fig, axs, population, prev_best, "running...",\
+        if live_plot: update_3figplot(fig, axs, population, prev_best, "running...",\
                                    time0=t_start)
 
         prev_best = population.best_chrom
@@ -282,7 +282,7 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
         n += 1  
 
     if live_plot: 
-        update_plot(fig, axs, population, prev_best, "finished", time0=t_start)
+        update_3figplot(fig, axs, population, prev_best, "finished", time0=t_start)
         plt.ioff()
         plt.show()
 
@@ -290,38 +290,37 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
     return population.best_chrom
 
 
-def initialize_plot():
+def initialize_3figplot():
         
         import matplotlib
         import matplotlib.pyplot as plt
-        plt.ion()
+        #plt.ion()
         #plt.style.use("dark_background")
         matplotlib.rcParams["toolbar"] = "None" #hide the toolbar
-        fig = plt.figure(figsize=(12,6))
+        fig = plt.figure(figsize=(12,6), dpi=100)
         fig.canvas.manager.set_window_title("live plot")
-        fig.suptitle("G-WING Live Plot", fontweight="bold")
         gs = fig.add_gridspec(3,4)
 
         ax1 = fig.add_subplot(gs[0,:3])
-        ax1.spines[:].set_color("dimgrey")
+        ax1.spines[:].set_color("lightgrey")
          
         ax2 = fig.add_subplot(gs[1,:3])
-        ax2.spines[:].set_color("dimgrey")
+        ax2.spines[:].set_color("lightgrey")
 
         ax3 = fig.add_subplot(gs[2,:])
-        ax3.spines[:].set_color("dimgrey")
+        ax3.spines[:].set_color("lightgrey")
         ax3.set_xlabel("generations")
         ax3.set_ylabel("fitness")
-        ax3.grid(color="dimgrey")
+        ax3.grid(color="lightgrey")
 
         ax4 = fig.add_subplot(gs[:2,3])
         ax4.set_xlim(0,1), ax4.set_ylim(0,1)
-        ax4.spines[:].set_color("dimgrey")
+        ax4.spines[:].set_color("lightgrey")
                 
         return fig, [ax1, ax2, ax3, ax4]
 
 
-def update_plot(fig, axs, population, prev_best_chrom, status_msg, time0=None,):
+def update_3figplot(fig, axs, population, prev_best_chrom, status_msg, time0=None,):
     ax1, ax2, ax3, ax4 = axs
     ax1.clear(), ax2.clear(), ax4.clear()
 

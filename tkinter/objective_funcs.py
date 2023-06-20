@@ -14,7 +14,9 @@ def max_LtoD(wing:object) -> float:
     CL_interp = np.linspace(min(wing.lift_coefficient), max(wing.lift_coefficient), 100)
     CD_interp = np.interp(CL_interp, wing.lift_coefficient, wing.drag_coefficient)
     lift_to_drag = np.divide(CL_interp, CD_interp)
-    return max(lift_to_drag)
+    #return max(lift_to_drag)
+
+    return max(np.divide(wing.lift_coefficient, wing.drag_coefficient))
 
 
 def max_L12toD(wing:object) -> float: 

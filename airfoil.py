@@ -266,7 +266,8 @@ class Airfoil:
             y = np.add(origin[1], y)
 
         #plot them lines! 
-        ax.plot(x, y, color=linecolor, linewidth=1)
+        line, = ax.plot(x, y, color=linecolor, linewidth=1)
+        return line 
 
     def pickle_airfoil(self):
         """

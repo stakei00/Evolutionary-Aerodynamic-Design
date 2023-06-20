@@ -8,6 +8,8 @@ import time
 sys.path.append(os.getcwd())
 import aero_evo as evo
 import objective_funcs as objf
+import matplotlib.pyplot as plt 
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 class Gwing_Gui: 
@@ -15,7 +17,7 @@ class Gwing_Gui:
     def __init__(self, root): 
 
         root.title("G-WING Control Panel")
-        root.geometry("700x400")
+        root.geometry("1200x900")
         self.root = root 
         self.is_running = False 
         self.is_paused = False
@@ -40,14 +42,37 @@ class Gwing_Gui:
         edit.add_command(label ='XFOIL Settings', command=self.open_xfoil_settings)
         edit.add_command(label ='AVL Settings', command=self.open_avl_settings)
 
+        #creating tabs 
+        self.tabs = Notebook(root)
+        self.tab_main = Frame(self.tabs)
+        self.tab_geom = Frame(self.tabs)
+        self.tab_aero = Frame(self.tabs)
+        self.tabs.add(self.tab_main, text="Main")
+        self.tabs.add(self.tab_geom, text="Geometry")
+        self.tabs.add(self.tab_aero, text="Aerodynamics")
+        self.tabs.grid(row=0, column=0, columnspan=3)
+
+        #initialize figures
+        self.initialize_figures()
+        #self.fig_live, self.axs_live = evo.initialize_3figplot()
+        canvas = FigureCanvasTkAgg(self.fig_hist, master=self.tab_main)
+        canvas.draw() 
+        canvas.get_tk_widget().grid(row=2, column=0, columnspan=3)
+
+        canvas = FigureCanvasTkAgg(self.fig_geom, master=self.tab_geom)
+        canvas.draw() 
+        canvas.get_tk_widget().grid(row=0, column=0, columnspan=3)
+
         #creating setup area 
-        Label(root, text = "Setup").grid(row=0, column=0, columnspan=3)
+        self.frame_setup = Frame(self.tab_main)
+        Label(self.frame_setup, text = "Setup").grid(row=0, column=0, columnspan=3)
         self.fitness_text = StringVar()
         self.fitness_text.set(settings["optimizer settings"]["fitness func"])
-        Label(root, textvariable=self.fitness_text).grid(row=1, column=1)
-        Label(root, text = "Objective Function:").grid(row=1, column=0)
-        b_fitfunc = Button(root, text="Change", command=self.open_function_selector)
+        Label(self.frame_setup, textvariable=self.fitness_text).grid(row=1, column=1)
+        Label(self.frame_setup, text = "Objective Function:  ").grid(row=1, column=0)
+        b_fitfunc = Button(self.frame_setup, text="Change", command=self.open_function_selector)
         b_fitfunc.grid(row=1, column=2)
+        self.frame_setup.grid(row=0, column=0, columnspan=3)
 
         #creating output window 
         Label(root, text = "Output").grid(row=4, column=0, columnspan=3)
@@ -58,11 +83,13 @@ class Gwing_Gui:
 
         #optimizer control buttons
         Label(root, text="Controls").grid(row=2, column=0, columnspan=3)
-        self.b_start = Button(root, text="Run", command=self.start_optimizer)
-        self.b_pause = Button(root, text="Pause", state=DISABLED, command=self.pause_optimizer)
-        self.b_stop = Button(root, text="Stop", state=DISABLED, command=self.stop_optimizer)
-        [b.grid(row=3, column=i) for i,b in enumerate([self.b_start,self.b_pause,self.b_stop])]
-
+        self.frame_controls = Frame(root)
+        self.b_start = Button(self.frame_controls, text="Run", command=self.start_optimizer)
+        self.b_pause = Button(self.frame_controls, text="Pause", state=DISABLED, command=self.pause_optimizer)
+        self.b_stop = Button(self.frame_controls, text="Stop", state=DISABLED, command=self.stop_optimizer)
+        [b.grid(row=0, column=i) for i,b in enumerate([self.b_start,self.b_pause,self.b_stop])]
+        self.frame_controls.grid(row=3, column=0, columnspan=3)
+        
     def write_to_output(self, text):
         """
         writes text to the output window 
@@ -121,17 +148,14 @@ class Gwing_Gui:
 
     def run_optimizer(self):
         """
+        Runs the optimizer population initialization and iterative loop
         """
-        live_plot = True  #! placeholder 
         multiproc = True #! placeholder
         self.load_inputs()
 
         #initialize population:  
         t_start = time.time()/60
-        if live_plot: 
-            import matplotlib.pyplot as plt
-            fig, axs = evo.initialize_plot()
-
+        
         #intialize population of m individuals
         popSize = self.study_parameters["population size"]
         k = self.study_parameters["children per generation"]
@@ -164,8 +188,10 @@ class Gwing_Gui:
         while self.is_running: 
             if not self.is_paused: 
                 
-                if live_plot: evo.update_plot(fig, axs, self.population, prev_best, "running...",\
-                                   time0=t_start)
+                self.update_history_plot(self.population)
+                self.update_geometry_plots(self.population, prev_best)
+                #evo.update_3figplot(self.fig_live, self.axs_live, self.population, prev_best, "running...",\
+                                   #time0=t_start)
                 prev_best = self.population.best_chrom
                 self.population.selection(k) #kill off worst performing chromosomes
                 self.population.crossover_and_mutation(k) #generate new children 
@@ -195,6 +221,9 @@ class Gwing_Gui:
         stops the optimizer loop
         """
         self.write_to_output("Stopping solution at next iteration.")
+
+        [ax.clear() for ax in [self.ax_foils, self.ax_planf, self.ax_hist]]
+
         self.is_running = False
         self.b_start.config(state=NORMAL)
         self.b_pause.config(state=DISABLED)
@@ -214,6 +243,70 @@ class Gwing_Gui:
 
         # Start a separate thread for the loop
         threading.Thread(target=self.run_optimizer).start() 
+
+    def initialize_figures(self):
+        """
+        initializes history and geometry plots 
+        """
+        #history plot 
+        self.fig_hist = plt.figure(figsize=(12,4), dpi=100)
+        self.ax_hist = self.fig_hist.add_subplot(111)
+        self.ax_hist.spines[:].set_color("dimgrey")
+        self.ax_hist.set_xlabel("Iteration")
+        self.ax_hist.set_ylabel("Objective")
+        self.ax_hist.grid(color="lightgrey")
+    
+        #planform and airfoils plot
+        self.fig_geom = plt.figure(figsize=(12,6), dpi=100)
+        self.ax_planf = self.fig_geom.add_subplot(211)
+        self.ax_planf.set_title("Planform")
+        self.ax_foils = self.fig_geom.add_subplot(212)
+        self.ax_foils.set_title("Root & Tip Sections")
+
+    def update_history_plot(self, population):
+        """
+        updates the chromosome fitness history plot 
+        """
+        if hasattr(self, "line_hist"):
+            self.line_hist.remove()
+        n_list = list(range(len(population.best_chrom_fitness)))
+
+        self.line_hist, = self.ax_hist.plot(n_list,population.best_chrom_fitness, "-o", color="red",\
+             linewidth=0.5, markersize=3)
+        
+        ver_count = 1
+        self.ax_hist.annotate(text="init", xy=(0, population.best_chrom_fitness[0]), ha="right", va="bottom")
+        for i,f in enumerate(population.best_chrom_fitness[:-1]):
+            if population.best_chrom_fitness[i+1] > f: 
+                xy = (i+1, population.best_chrom_fitness[i+1])
+                self.ax_hist.annotate(text=str(ver_count), xy=xy, ha="right", va="bottom")
+                ver_count+=1
+
+        self.fig_hist.canvas.draw()
+        self.fig_hist.canvas.flush_events()
+    
+    def update_geometry_plots(self, population, prev_best):
+        """
+        updates planform and geometry plots
+        """
+        
+        if hasattr(self, "lines_planf"):
+            [l.remove() for l in self.lines_planf]
+
+        if hasattr(self, "lines_foils"):
+            [l.remove() for l in self.lines_foils]
+
+        best_wing = population.best_chrom
+        lines1 = prev_best.plot_wing_planform(self.ax_planf, linecolor="lightgrey")
+        lines2 = best_wing.plot_wing_planform(self.ax_planf, linecolor="black")
+        lines3 = prev_best.plot_wing_airfoils(self.ax_foils, linecolor="lightgrey")
+        lines4 = best_wing.plot_wing_airfoils(self.ax_foils, linecolor="black")
+
+        self.lines_planf = lines1 + lines2
+        self.lines_foils = lines3 + lines4
+
+        self.fig_geom.canvas.draw() 
+        self.fig_geom.canvas.flush_events()
 
 
 class Optimizer_Settings:
@@ -293,7 +386,7 @@ class Optimizer_Settings:
             json.dump(self.full_settings, file)
 
     def num_gens_checkbutton(self):
-
+        #number of generations check button controller
         if self.numgen_enabled.get(): 
             self.t_numgen.config(state=NORMAL) 
         else:
@@ -660,11 +753,11 @@ class Function_Selector:
             json.dump(full_settings, file)
 
         self.l_status.configure(text="selected")
-        self.main.fitness_text.set(self.selected_index)
+        self.main.fitness_text.set(self.selected_item)
         self.main.root.update()
             
 
-if __name__=="__main__":
+if __name__ == "__main__":
     
     root = Tk()
     gui = Gwing_Gui(root)
