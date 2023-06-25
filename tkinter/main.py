@@ -10,6 +10,7 @@ import aero_evo as evo
 import objective_funcs as objf
 import matplotlib.pyplot as plt 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import time
 
 
 class Gwing_Gui: 
@@ -54,18 +55,23 @@ class Gwing_Gui:
 
         #initialize figures
         self.initialize_figures()
-        #self.fig_live, self.axs_live = evo.initialize_3figplot()
         canvas = FigureCanvasTkAgg(self.fig_hist, master=self.tab_main)
         canvas.draw() 
-        canvas.get_tk_widget().grid(row=2, column=0, columnspan=3)
-
+        canvas.get_tk_widget().grid(row=2, column=0, columnspan=3, rowspan=2)
         canvas = FigureCanvasTkAgg(self.fig_geom, master=self.tab_geom)
         canvas.draw() 
         canvas.get_tk_widget().grid(row=0, column=0, columnspan=3)
 
         #creating setup area 
+        self.status = StringVar()
+        self.status.set("waiting")
         self.frame_setup = Frame(self.tab_main)
-        Label(self.frame_setup, text = "Setup").grid(row=0, column=0, columnspan=3)
+        Label(self.frame_setup, text = "Setup").grid(row=0, column=0)
+        Label(self.frame_setup, text="Status: ").grid(row=0, column=3)
+        Label(self.frame_setup, textvariable=self.status).grid(row=0, column=4)
+        Label(self.frame_setup, text="Runtime: ").grid(row=1, column=3)
+        self.timer_label = Label(self.frame_setup, text="00:00:00")
+        self.timer_label.grid(row=1, column=4)
         self.fitness_text = StringVar()
         self.fitness_text.set(settings["optimizer settings"]["fitness func"])
         Label(self.frame_setup, textvariable=self.fitness_text).grid(row=1, column=1)
@@ -170,6 +176,7 @@ class Gwing_Gui:
         [os.remove(file) for file in file_list if file.split("_")[0] == "polar"]
 
         #create population 
+        self.write_to_output(text="Initializing population...")
         self.population = evo.Population(size=popSize, wing_parameters=self.wing_parameters,\
                                 mutation_probs=[p_child_mut, p_gene_mut],\
                                     seed_wing=self.seed_wing, multiproc=multiproc)  
@@ -185,6 +192,7 @@ class Gwing_Gui:
 
         #main loop:
         n = 0 # iteration counter 
+        self.write_to_output(text="Iterating population...")
         while self.is_running: 
             if not self.is_paused: 
                 
@@ -211,10 +219,13 @@ class Gwing_Gui:
             self.write_to_output("Resuming Solution")
             self.is_paused = False
             self.b_pause.config(text="Pause")
+            threading.Thread(target=self.update_timer).start()
         else:
             self.write_to_output("Pausing solution at next iteration.")
             self.is_paused = True
             self.b_pause.config(text="Resume")
+        
+        self.status.set("paused")
 
     def stop_optimizer(self):
         """
@@ -228,6 +239,7 @@ class Gwing_Gui:
         self.b_start.config(state=NORMAL)
         self.b_pause.config(state=DISABLED)
         self.b_stop.config(state=DISABLED)
+        self.status.set("stopped")
 
     def start_optimizer(self):
         """
@@ -236,6 +248,8 @@ class Gwing_Gui:
         self.write_to_output("Starting solution")
         self.is_running = True
         self.is_paused = False
+        threading.Thread(target=self.start_timer).start()
+        self.status.set("running")
 
         self.b_start.config(state=DISABLED)
         self.b_pause.config(state=NORMAL)
@@ -259,9 +273,13 @@ class Gwing_Gui:
         #planform and airfoils plot
         self.fig_geom = plt.figure(figsize=(12,6), dpi=100)
         self.ax_planf = self.fig_geom.add_subplot(211)
-        self.ax_planf.set_title("Planform")
+        self.ax_planf.set_title("Planform", fontdict={"color":"grey"})
         self.ax_foils = self.fig_geom.add_subplot(212)
-        self.ax_foils.set_title("Root & Tip Sections")
+        self.ax_foils.set_title("Root & Tip Sections", fontdict={"color":"grey"})
+        self.ax_foils.spines[:].set_color("lightgrey")
+        self.ax_foils.tick_params(colors="grey")
+        self.ax_planf.spines[:].set_color("lightgrey")
+        self.ax_planf.tick_params(colors="grey")
 
     def update_history_plot(self, population):
         """
@@ -307,6 +325,24 @@ class Gwing_Gui:
 
         self.fig_geom.canvas.draw() 
         self.fig_geom.canvas.flush_events()
+
+    def start_timer(self):
+        global start_time
+        start_time = time.time() 
+        self.update_timer()
+
+    def update_timer(self):
+        current_time = time.time() - start_time
+        hours = int(current_time // 3600)
+        minutes = int((current_time // 60) % 60)
+        seconds = int(current_time % 60)
+        self.timer_label.config(text=f"{hours:02d}:{minutes:02d}:{seconds:02d}")
+        if not self.is_paused or not self.is_running:
+            self.timer_label.after(1000, self.update_timer)
+
+    def reset_timer(self):
+        self.timer_label.config(text="00:00:00")
+
 
 
 class Optimizer_Settings:

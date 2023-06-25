@@ -7,7 +7,7 @@ import os
 class Airfoil:
 
     def __init__(self, m:float, p:float, t:float, Re:int, aseq:list=[-24,24,1],\
-                 n_iter:int=200, ncrit:int=9, search_airfoils=True) -> None:
+                 n_iter:int=200, ncrit:int=9, search_airfoils=False) -> None:
         """
         Initializes airfoil object
         Inputs:
@@ -135,82 +135,105 @@ class Airfoil:
         """
         Gets 3 points on CLCD drag polar for use with AVL
         """
-        alpha_interp = np.linspace(min(self.alpha_raw), max(self.alpha_raw), 200)
-        cl_interp_func = interp1d(self.alpha_raw, self.lift_coefficient_raw, kind="quadratic")
-        cl_interp = np.array([cl_interp_func(a) for a in alpha_interp])
-        dcl_dalpha = np.gradient(cl_interp, alpha_interp[1]-alpha_interp[0]) #lift slope
+
+        #expand raw data points using interpolation
+        self.alpha_interp = np.linspace(min(self.alpha_raw), max(self.alpha_raw), 200)
+        cl_interp_func = interp1d(self.alpha_raw, self.lift_coefficient_raw)
+        cd_interp_func = interp1d(self.alpha_raw, self.drag_coefficient_raw)
+        self.cl_interp = np.array([cl_interp_func(a) for a in self.alpha_interp])
+        dcl_dalpha = np.gradient(self.cl_interp, self.alpha_interp[1]-self.alpha_interp[0]) #lift slope
 
         #get index of first angle of attack >= 0: 
-        ind_alpha0 = len(alpha_interp)/2
-        for i,a in enumerate(alpha_interp[1:]):
-            if a >= 0 and alpha_interp[i-1] < 0:
+        ind_alpha0 = int(len(self.alpha_interp)/2)
+        for i,a in enumerate(self.alpha_interp[1:]):
+            if a >= 0 and self.alpha_interp[i-1] < 0:
                 ind_alpha0 = i
+                break 
 
         baseline_lift_slope = dcl_dalpha[ind_alpha0]
 
         #find max lift coefficient
         cl_max_ind = None
-        for i,a in enumerate(alpha_interp[:-1]):
+        for i,a in enumerate(self.alpha_interp[:-1]):
             if a < 0: continue 
-            if dcl_dalpha[i] < 0.1*baseline_lift_slope: 
-                cl_max_ind = i-1
-                break
-            #if dcl_dalpha[i]*dcl_dalpha[i+1] < 0: 
-            #    cl_max_ind = i-1
-            #    break
+            if dcl_dalpha[i]*dcl_dalpha[i+1] < 0: #if sign change 
+                cl_max_ind = i
+                break 
+                
+        if cl_max_ind is None: 
+            cl3, cd3 = None, None
+            self.max_lift_coefficient = None
+        else:     
+            self.alpha_max_lift_coeff = self.alpha_interp[cl_max_ind]
+            self.max_lift_coefficient = self.cl_interp[cl_max_ind]
+            cl3, cd3 = self.max_lift_coefficient, cd_interp_func(self.alpha_max_lift_coeff)
 
-        if cl_max_ind is None: #if unable to find CL max, abort
-            return 
-        self.max_lift_coefficient = cl_interp[cl_max_ind]
-        
         #try to find min lift coefficient
-        cl_interp_flip = np.flip(cl_interp)
-        cl_min_ind = np.argmin(cl_interp_flip)
-        alpha_interp_flip = np.flip(alpha_interp)
+        alpha_interp_flip = np.flip(self.alpha_interp)
         dcl_dalpha_flip = np.flip(dcl_dalpha)
-        
+
+        cl_min_ind = None
         for i,a in enumerate(alpha_interp_flip[:-1]):
             if a > 0: continue 
-            if dcl_dalpha_flip[i] < 0.1*baseline_lift_slope: 
-                cl_min_ind = i-1
-                self.min_lift_coefficient = cl_interp[len(cl_interp)-1-cl_min_ind]
+            if dcl_dalpha_flip[i]*dcl_dalpha_flip[i+1] < 0: #if sign change 
+                cl_min_ind = len(self.alpha_interp)-1-i 
                 break
-            #if dcl_dalpha_flip[i]*dcl_dalpha_flip[i+1] < 0: 
-            #    cl_min_ind = i-1
-            #    break
-                
-        cl_min_ind = len(cl_interp) - 1 - cl_min_ind
 
+        if cl_min_ind is None: 
+            cl_min_ind = 0
+            cl1, cd1 = None, None
+            self.min_lift_coefficient = None 
+        else:  
+            self.min_lift_coefficient = self.cl_interp[cl_min_ind]
+            self.alpha_min_lift_coeff =  self.alpha_interp[cl_min_ind]
+            cl1, cd1 = self.min_lift_coefficient, cd_interp_func(self.alpha_min_lift_coeff)
+                
         #trim alpha, cl, cd arrays 
         alpha_new, cl_new, cd_new, cm_new = [],[],[],[]
         for i,a in enumerate(self.alpha_raw):
-            if a < alpha_interp[cl_min_ind]: continue
-            if a > alpha_interp[cl_max_ind]: break
+            if cl_min_ind is not None: 
+                if a < self.alpha_interp[cl_min_ind]: continue
+            if cl_max_ind is not None: 
+                if a > self.alpha_interp[cl_max_ind]: break
 
             alpha_new.append(a)
             cm_new.append(self.moment_coefficient_raw[i])
             cl_new.append(self.lift_coefficient_raw[i])
-            cd_new.append(self.drag_coefficient_raw[i]) 
-
-        #update attribute arrays 
+            cd_new.append(self.drag_coefficient_raw[i])
+        
         self.alpha = alpha_new 
         self.lift_coefficient = cl_new
+        self.moment_coefficient = cm_new
         self.drag_coefficient = cd_new
-        self.moment_coefficient = cm_new 
 
         #interpolate drag coefficient
         if len(self.lift_coefficient) < 2: 
             return
         
-        cl_interp = np.array([cl_interp_func(a) for a in alpha_interp[cl_min_ind:cl_max_ind+1]])
-        cd_interp_func = interp1d(self.lift_coefficient, self.drag_coefficient, kind="linear", bounds_error=False, fill_value="extrapolate")
-        cd_interp = np.array([cd_interp_func(cl) for cl in cl_interp])
-        cd_min_ind = np.argmin(cd_interp)
+        self.alpha_interp = self.alpha_interp[cl_min_ind:cl_max_ind+1]
+        self.cl_interp = np.array([cl_interp_func(a) for a in self.alpha_interp])
+        self.cd_interp = np.array([cd_interp_func(a) for a in self.alpha_interp])
+        cd_min_ind = np.argmin(self.cd_interp)
 
+        dcl_dalpha = dcl_dalpha[cl_min_ind:cl_max_ind+1]
+        for i,a in enumerate(self.alpha_interp):
+            if a < 0: continue
+            if dcl_dalpha[i] < 0.2*baseline_lift_slope:
+                cl3 = self.cl_interp[i]
+                cd3 = self.cd_interp[i]
+                break 
+        
+        alpha_interp_flip = np.flip(self.alpha_interp)
+        dcl_dalpha_flip = np.flip(dcl_dalpha)
+        for i,a in enumerate(alpha_interp_flip):
+            if a >= 0: continue 
+            if dcl_dalpha_flip[i] < 0.2*baseline_lift_slope: 
+                ind = len(self.cl_interp)-1-i
+                cl1 = self.cl_interp[ind]
+                cd1 = self.cd_interp[ind]
+        
         #pack up everything and add as object attribute
-        cl1, cd1 = cl_interp[0], cd_interp[0]
-        cl2, cd2 = cl_interp[cd_min_ind], cd_interp[cd_min_ind]
-        cl3, cd3 = cl_interp[-1], cd_interp[-1]
+        cl2, cd2 = self.cl_interp[cd_min_ind], self.cd_interp[cd_min_ind]
 
         self.CDCL_avl = [cl1, cd1, cl2, cd2, cl3, cd3]
 
@@ -358,8 +381,13 @@ class Airfoil_Interpolator:
                                 self.values, bounds_error=False,\
                                     fill_value=None)
 
+
 if __name__ == "__main__":
     
+    #testing out custom airfoil 
+    afoil = Airfoil(m=0.06, p=0.3, t=0.09, Re=1e6)
+
+
     #testing out airfoil interpolator
     interpolator = Airfoil_Interpolator("xfoil_batch_data.json")
 

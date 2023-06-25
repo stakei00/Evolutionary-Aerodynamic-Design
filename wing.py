@@ -36,7 +36,7 @@ class Wing:
         
         #setting up header
         header = avlInput.AvlHeader(configname="WING", iYsym=1, Sref=self.area,\
-                                    Cref=self.mean_aero_chord, Bref=self.span)
+                                    Cref=self.mean_aero_chord, Bref=self.span, CGref=(0.25,0,0))
         
         #setting up root section 
         section_root = avlInput.AvlSection(chord=self.root_chord, Nspan=10, \
@@ -94,7 +94,7 @@ class Wing:
             max_spanwise_cl.append(stripForces.strips[0].cl[i_max_cl])
             max_span_cl_y.append(y_le[i_max_cl])
 
-        for i,a in enumerate(alpha):
+        for i,_ in enumerate(alpha):
             max_cl = max_spanwise_cl[i]
             y_max_cl = max_span_cl_y[i]
             cl_max_root = self.airfoil_root.max_lift_coefficient
@@ -158,19 +158,31 @@ class Wing:
         ax7 = fig.add_subplot(gs[1:,2])
 
         #airfoil plots: 
-        ax1.plot(self.airfoil_root.alpha, self.airfoil_root.lift_coefficient,\
+        ax1.plot(self.airfoil_root.alpha_raw, self.airfoil_root.lift_coefficient_raw,\
                  label=f"r: NACA{self.airfoil_root.NACA_4series_desig}")
-        ax1.plot(self.airfoil_tip.alpha, self.airfoil_tip.lift_coefficient,\
+        ax1.plot(self.airfoil_tip.alpha_raw, self.airfoil_tip.lift_coefficient_raw,\
                  label=f"t: NACA{self.airfoil_tip.NACA_4series_desig}")
+        ax1.scatter([self.airfoil_root.alpha_min_lift_coeff, 
+                     self.airfoil_root.alpha_max_lift_coeff],
+                     [self.airfoil_root.min_lift_coefficient, 
+                      self.airfoil_root.max_lift_coefficient])
+        ax1.scatter([self.airfoil_tip.alpha_min_lift_coeff, 
+                     self.airfoil_tip.alpha_max_lift_coeff],
+                     [self.airfoil_tip.min_lift_coefficient, 
+                      self.airfoil_tip.max_lift_coefficient])
         ax1.set_xlabel("$\u03B1^{\circ}$"), ax1.set_ylabel("$c_l$"), ax1.grid()
         ax1.legend()
 
-        ax2.plot(self.airfoil_root.alpha, self.airfoil_root.moment_coefficient)
-        ax2.plot(self.airfoil_tip.alpha, self.airfoil_tip.moment_coefficient)
+        ax2.plot(self.airfoil_root.alpha_raw, self.airfoil_root.moment_coefficient_raw)
+        ax2.plot(self.airfoil_tip.alpha_raw, self.airfoil_tip.moment_coefficient_raw)
         ax2.set_xlabel("$\u03B1^{\circ}$"), ax2.set_ylabel("$c_m$"), ax2.grid()
 
-        ax3.plot(self.airfoil_root.drag_coefficient, self.airfoil_root.lift_coefficient)
-        ax3.plot(self.airfoil_tip.drag_coefficient, self.airfoil_tip.lift_coefficient)
+        ax3.plot(self.airfoil_root.drag_coefficient_raw, self.airfoil_root.lift_coefficient_raw)
+        ax3.plot(self.airfoil_tip.drag_coefficient_raw, self.airfoil_tip.lift_coefficient_raw)
+        ax3.scatter([self.airfoil_root.CDCL_avl[i] for i in range(1,6,2)], 
+                    [self.airfoil_root.CDCL_avl[i] for i in range(0,6,2)])
+        ax3.scatter([self.airfoil_tip.CDCL_avl[i] for i in range(1,6,2)], 
+                    [self.airfoil_tip.CDCL_avl[i] for i in range(0,6,2)])
         ax3.set_xlabel("$c_d$"), ax3.set_ylabel("$c_l$"), ax3.grid()
         
         #wing plots: 
@@ -195,8 +207,7 @@ class Wing:
                                     self.airfoil_tip.max_lift_coefficient],\
                                         linestyle="dashed", color="black")
         ax6.set_xlabel("y"), ax6.set_ylabel("$c_l$"), ax6.grid()
-        
-
+    
         plt.show()
 
     def export_wing(self): 
