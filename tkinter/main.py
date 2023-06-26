@@ -23,7 +23,7 @@ class Gwing_Gui:
         self.is_running = False 
         self.is_paused = False
         self.seed_wing = None
-        settings = json.load(open("tkinter/user_settings.json", "r"))
+        self.settings = json.load(open("tkinter/user_settings.json", "r"))
 
         # Creating Menubar
         self.menubar = Menu(root)
@@ -47,38 +47,20 @@ class Gwing_Gui:
         self.tabs = Notebook(root)
         self.tab_main = Frame(self.tabs)
         self.tab_geom = Frame(self.tabs)
-        self.tab_aero = Frame(self.tabs)
+        self.tab_xfoil = Frame(self.tabs)
+        self.tab_avl = Frame(self.tabs)
         self.tabs.add(self.tab_main, text="Main")
         self.tabs.add(self.tab_geom, text="Geometry")
-        self.tabs.add(self.tab_aero, text="Aerodynamics")
+        self.tabs.add(self.tab_xfoil, text="XFOIL")
+        self.tabs.add(self.tab_avl, text="AVL")
         self.tabs.grid(row=0, column=0, columnspan=3)
 
-        #initialize figures
+        #initialize figures and tabs
         self.initialize_figures()
-        canvas = FigureCanvasTkAgg(self.fig_hist, master=self.tab_main)
-        canvas.draw() 
-        canvas.get_tk_widget().grid(row=2, column=0, columnspan=3, rowspan=2)
-        canvas = FigureCanvasTkAgg(self.fig_geom, master=self.tab_geom)
-        canvas.draw() 
-        canvas.get_tk_widget().grid(row=0, column=0, columnspan=3)
-
-        #creating setup area 
-        self.status = StringVar()
-        self.status.set("waiting")
-        self.frame_setup = Frame(self.tab_main)
-        Label(self.frame_setup, text = "Setup").grid(row=0, column=0)
-        Label(self.frame_setup, text="Status: ").grid(row=0, column=3)
-        Label(self.frame_setup, textvariable=self.status).grid(row=0, column=4)
-        Label(self.frame_setup, text="Runtime: ").grid(row=1, column=3)
-        self.timer_label = Label(self.frame_setup, text="00:00:00")
-        self.timer_label.grid(row=1, column=4)
-        self.fitness_text = StringVar()
-        self.fitness_text.set(settings["optimizer settings"]["fitness func"])
-        Label(self.frame_setup, textvariable=self.fitness_text).grid(row=1, column=1)
-        Label(self.frame_setup, text = "Objective Function:  ").grid(row=1, column=0)
-        b_fitfunc = Button(self.frame_setup, text="Change", command=self.open_function_selector)
-        b_fitfunc.grid(row=1, column=2)
-        self.frame_setup.grid(row=0, column=0, columnspan=3)
+        self.initialize_geom_tab()
+        self.initialize_main_tab()
+        self.initialize_xfoil_tab()
+        self.initialize_avl_tab()
 
         #creating output window 
         Label(root, text = "Output").grid(row=4, column=0, columnspan=3)
@@ -95,7 +77,99 @@ class Gwing_Gui:
         self.b_stop = Button(self.frame_controls, text="Stop", state=DISABLED, command=self.stop_optimizer)
         [b.grid(row=0, column=i) for i,b in enumerate([self.b_start,self.b_pause,self.b_stop])]
         self.frame_controls.grid(row=3, column=0, columnspan=3)
-        
+
+    def initialize_main_tab(self):
+        """
+        """
+        canvas = FigureCanvasTkAgg(self.fig_hist, master=self.tab_main)
+        canvas.draw() 
+        canvas.get_tk_widget().grid(row=2, column=0, columnspan=3, rowspan=2)
+
+        #creating setup area 
+        self.status = StringVar()
+        self.status.set("waiting")
+        self.frame_setup = Frame(self.tab_main)
+        Label(self.frame_setup, text = "Setup").grid(row=0, column=0)
+        Label(self.frame_setup, text="Status: ").grid(row=0, column=3)
+        Label(self.frame_setup, textvariable=self.status).grid(row=0, column=4)
+        Label(self.frame_setup, text="Runtime: ").grid(row=1, column=3)
+        self.timer_label = Label(self.frame_setup, text="00:00:00")
+        self.timer_label.grid(row=1, column=4)
+        self.fitness_text = StringVar()
+        self.fitness_text.set(self.settings["optimizer settings"]["fitness func"])
+        Label(self.frame_setup, textvariable=self.fitness_text).grid(row=1, column=1)
+        Label(self.frame_setup, text = "Objective Function:  ").grid(row=1, column=0)
+        b_fitfunc = Button(self.frame_setup, text="Change", command=self.open_function_selector)
+        b_fitfunc.grid(row=1, column=2)
+        self.frame_setup.grid(row=0, column=0, columnspan=3)
+
+    def initialize_geom_tab(self):
+        """
+        """
+        canvas = FigureCanvasTkAgg(self.fig_geom, master=self.tab_geom)
+        canvas.draw() 
+        canvas.get_tk_widget().grid(row=0, column=0, columnspan=3)
+
+    def initialize_xfoil_tab(self):
+        """
+        """
+        root = self.tab_xfoil
+        canvas = FigureCanvasTkAgg(self.fig_xfoil, master=root)
+        canvas.draw()
+        canvas.get_tk_widget().grid(row=2, column=0, columnspan=10)
+
+        self.b_runxfoil = Button(root, text="Run XFOIL", command=None).grid(row=0, column=0)
+        Label(root, text="Airfoil 1: NACA").grid(row=0, column=1)
+        Label(root, text="Airfoil 2 NACA").grid(row=1, column=1)
+        self.t_foil1 = Entry(root).grid(row=0, column=2)
+        self.t_foil2 = Entry(root).grid(row=1, column=2)
+
+        Label(root, text="XFOIL Parameters").grid(row=4, column=0)
+
+        Label(root, text="Iterations:").grid(row=5, column=0)
+        self.t_niter = Entry(root).grid(row=5, column=1)
+
+        Label(root, text="Ncrit:").grid(row=5, column=2)
+        self.t_ncrit = Entry(root).grid(row=5, column=3)
+
+        Label(root, text="Alpha Sequence:").grid(row=5, column=4)
+        Label(root, text="initial").grid(row=4, column=5)
+        Label(root, text="step").grid(row=4, column=6)
+        Label(root, text="final").grid(row=4, column=7)
+        self.t_alpha_i = Entry(root).grid(row=5, column=5)
+        self.t_alpha_step = Entry(root).grid(row=5, column=6)
+        self.t_alpha_f = Entry(root).grid(row=5, column=7)
+
+        Label(root, text="Reynolds/Chord:").grid(row=5, column=8)
+        self.t_re_c = Entry(root).grid(row=5, column=9)
+
+
+    def initialize_avl_tab(self):
+        """
+        """
+        root = self.tab_avl
+
+        root = self.tab_avl
+        canvas = FigureCanvasTkAgg(self.fig_avl, master=root)
+        canvas.draw()
+        canvas.get_tk_widget().grid(row=2, column=0, columnspan=7)
+
+        self.frame_avl_plots = Frame(root)
+        self.b_runavl = Button(root, text="Run AVL", command=None).grid(row=0, column=0)
+
+        Label(root, text="Aspect Ratio:").grid(row=0, column=1)
+        self.t_AR = Entry(root).grid(row=0, column=2)
+        Label(root, text="Taper Ratio:").grid(row=1, column=1)
+        self.t_taper = Entry(root).grid(row=1, column=2)
+        Label(root, text="Sweep (deg):").grid(row=0, column=3)
+        self.t_sweep = Entry(root).grid(row=0, column=4)
+        Label(root, text="Twist (deg):").grid(row=1, column=3)
+        self.t_twist = Entry(root).grid(row=1, column=4)
+        Label(root, text="Root: NACA").grid(row=0, column=5)
+        self.t_rootfoil = Entry(root).grid(row=0, column=6)
+        Label(root, text="Tip: NACA").grid(row=1, column=5)
+        self.t_tipfoil = Entry(root).grid(row=1, column=6)
+
     def write_to_output(self, text):
         """
         writes text to the output window 
@@ -119,10 +193,14 @@ class Gwing_Gui:
     def open_xfoil_settings(self):
         """
         """
+        self.write_to_output("Opening xfoil settings")
+        Xfoil_Settings(root)
 
     def open_avl_settings(self):
         """
         """
+        self.write_to_output("Opening avl settings")
+        Avl_Settings(root)
 
     def open_seed_builder(self):
         """
@@ -141,6 +219,8 @@ class Gwing_Gui:
         full_inputs = json.load(open("tkinter/user_settings.json", "r"))
         self.study_parameters = full_inputs["optimizer settings"]
         self.wing_parameters = full_inputs["wing parameters"]
+        self.xfoil_settings = full_inputs["xfoil settings"]
+        self.avl_settings = full_inputs["avl settings"]
 
         fitness_translator = {
             "max L/D":          objf.max_LtoD,
@@ -156,11 +236,9 @@ class Gwing_Gui:
         """
         Runs the optimizer population initialization and iterative loop
         """
-        multiproc = True #! placeholder
+    
         self.load_inputs()
-
-        #initialize population:  
-        t_start = time.time()/60
+        multiproc = self.study_parameters["num cpu"]
         
         #intialize population of m individuals
         popSize = self.study_parameters["population size"]
@@ -177,9 +255,12 @@ class Gwing_Gui:
 
         #create population 
         self.write_to_output(text="Initializing population...")
-        self.population = evo.Population(size=popSize, wing_parameters=self.wing_parameters,\
-                                mutation_probs=[p_child_mut, p_gene_mut],\
-                                    seed_wing=self.seed_wing, multiproc=multiproc)  
+        self.population = evo.Population(size=popSize, 
+                            wing_parameters=self.wing_parameters,
+                            mutation_probs=[p_child_mut, p_gene_mut],
+                            xfoil_settings=self.xfoil_settings, 
+                            avl_settings=self.avl_settings, 
+                            seed_wing=None, multiproc=multiproc)  
 
         #evaluate fitness of initial population 
         [chrom.evaluate_fitness(self.fitness_function) for chrom in self.population.chroms]
@@ -281,6 +362,15 @@ class Gwing_Gui:
         self.ax_planf.spines[:].set_color("lightgrey")
         self.ax_planf.tick_params(colors="grey")
 
+        #xfoil plots 
+        self.fig_xfoil = plt.figure(figsize=(12,5), dpi=100)
+        self.ax_xfoil_cla = self.fig_xfoil.add_subplot(131)
+        self.ax_xfoil_cma = self.fig_xfoil.add_subplot(132)
+        self.ax_xfoil_cdcl = self.fig_xfoil.add_subplot(133)
+
+        #avl plots
+        self.fig_avl = plt.figure(figsize=(12,5), dpi=100)
+
     def update_history_plot(self, population):
         """
         updates the chromosome fitness history plot 
@@ -344,7 +434,6 @@ class Gwing_Gui:
         self.timer_label.config(text="00:00:00")
 
 
-
 class Optimizer_Settings:
 
     def __init__(self,root):
@@ -352,7 +441,7 @@ class Optimizer_Settings:
         self.full_settings = json.load(open("tkinter/user_settings.json", "r"))
         self.settings = self.full_settings["optimizer settings"]        
         top = Toplevel(root)
-        top.geometry("360x160")
+        top.geometry("360x180")
         top.title("optimizer settings")
 
         Label(top, text="population size:").grid(row=1, column=0)
@@ -375,25 +464,30 @@ class Optimizer_Settings:
         self.t_cmut.insert(END, str(self.settings["child mutation probability"]))
         self.t_cmut.grid(row=4, column=1, columnspan=2)
 
-        Label(top, text="limit number of generations").grid(row=5, column=0)
+        Label(top, text="# of parallel processors").grid(row=5, column=0)
+        self.t_numcor = Entry(top)
+        self.t_numcor.insert(END, str(self.settings["num cpu"]))
+        self.t_numcor.grid(row=5, column=1, columnspan=2)
+
+        Label(top, text="limit number of generations").grid(row=6, column=0)
         self.numgen_enabled = BooleanVar()
         self.numgen_enabled.set("number of gens" in list(self.settings.keys()))
         cb_numgen = Checkbutton(top, variable=self.numgen_enabled, command=self.num_gens_checkbutton)
-        cb_numgen.grid(row=5, column=1)
+        cb_numgen.grid(row=6, column=1)
         self.t_numgen = Entry(top)
         if self.numgen_enabled.get(): 
             self.t_numgen.insert(END, str(self.settings["number of gens"]))
         else: 
             self.t_numgen.config(state=DISABLED)
-        self.t_numgen.grid(row=5, column=2)
+        self.t_numgen.grid(row=6, column=2)
 
         self.b_save = Button(master=top, text="save",command=self.save_optimizer_settings)
-        self.b_save.grid(row=6, column=0)
+        self.b_save.grid(row=7, column=0)
         self.b_close = Button(master=top, text="close", command=top.destroy)
-        self.b_close.grid(row=6, column=1) 
+        self.b_close.grid(row=7, column=1) 
 
         self.l_status = Label(top, text="")
-        self.l_status.grid(row=7, column=0)
+        self.l_status.grid(row=8, column=0)
 
     def save_optimizer_settings(self): 
         
@@ -404,6 +498,7 @@ class Optimizer_Settings:
             subdict["children per generation"] = int(self.t_numChild.get())
             subdict["gene mutation probability"] = float(self.t_gmut.get())
             subdict["child mutation probability"] = float(self.t_cmut.get())
+            subdict["num cpu"] = int(self.t_numcor.get())
 
             if self.numgen_enabled.get():
                 subdict["number of gens"] = int(self.t_numgen.get())
@@ -411,11 +506,15 @@ class Optimizer_Settings:
             self.l_status.configure(text="invalid value")
             return 
         
+        if subdict["num cpu"] < 1: 
+            self.l_status.configure(text="invalid number of cores")
+            return
+        
         if subdict == self.settings: 
             self.l_status.configure(text="settings not changed")
             return 
 
-        self.l_status.configure(text="saved settings.")
+        self.l_status.configure(text="saved settings")
         self.settings = subdict
         self.full_settings["optimizer settings"] = self.settings
         with open("tkinter/user_settings.json", "w") as file: 
@@ -604,7 +703,7 @@ class Wing_Parameters:
 
 
         # ROOT AIRFOIL THICKNESS
-        init_val = self.settings["root camber location"]
+        init_val = self.settings["root thickness"]
         Label(top, text="3+4th NACA digits:").grid(row=9, column=0)
         self.t_roott_min, self.t_roott_val, self.t_roott_max = Entry(top), Entry(top), Entry(top)
         self.roott_sweep = BooleanVar()
@@ -672,7 +771,7 @@ class Wing_Parameters:
 
 
         # ROOT AIRFOIL THICKNESS
-        init_val = self.settings["tip camber location"]
+        init_val = self.settings["tip thickness"]
         Label(top, text="3+4th NACA digits:").grid(row=13, column=0)
         self.t_tipt_min, self.t_tipt_val, self.t_tipt_max = Entry(top), Entry(top), Entry(top)
         self.tipt_sweep = BooleanVar()
@@ -792,6 +891,168 @@ class Function_Selector:
         self.main.fitness_text.set(self.selected_item)
         self.main.root.update()
             
+
+class Xfoil_Settings: 
+
+    def __init__(self, root):
+
+        self.full_settings = json.load(open("tkinter/user_settings.json", "r"))
+        self.settings = self.full_settings["xfoil settings"]
+        top = Toplevel(root) 
+        top.geometry("360x180")
+        top.title("Default XFOIL Settings")
+
+        Label(top, text="Iterations:").grid(row=1, column=0)
+        self.t_iter = Entry(top)
+        self.t_iter.insert(END, str(self.settings["iterations"]))
+        self.t_iter.grid(row=1, column=1, columnspan=2) 
+
+        Label(top, text="Transition Parameter (ncrit):").grid(row=2, column=0)
+        self.t_ncrit = Entry(top)
+        self.t_ncrit.insert(END, str(self.settings["Ncrit"]))
+        self.t_ncrit.grid(row=2, column=1, columnspan=2) 
+
+        Label(top, text="Timeout Limit (sec):").grid(row=3, column=0)
+        self.t_timeout = Entry(top)
+        self.t_timeout.insert(END, str(self.settings["timeout limit"]))
+        self.t_timeout.grid(row=3, column=1, columnspan=2) 
+
+        Label(top, text="Initial AoA (deg):").grid(row=4, column=0)
+        self.t_alpha_i = Entry(top)
+        self.t_alpha_i.insert(END, str(self.settings["alpha_i"]))
+        self.t_alpha_i.grid(row=4, column=1, columnspan=2) 
+
+        Label(top, text="Final AoA (deg):").grid(row=5, column=0)
+        self.t_alpha_f = Entry(top)
+        self.t_alpha_f.insert(END, str(self.settings["alpha_f"]))
+        self.t_alpha_f.grid(row=5, column=1, columnspan=2) 
+
+        Label(top, text="AoA Step (deg):").grid(row=6, column=0)
+        self.t_alpha_step = Entry(top)
+        self.t_alpha_step.insert(END, str(self.settings["alpha_step"]))
+        self.t_alpha_step.grid(row=6, column=1, columnspan=2) 
+
+        self.b_save = Button(master=top, text="save",command=self.save_xfoil_settings)
+        self.b_save.grid(row=7, column=0)
+        self.b_close = Button(master=top, text="close", command=top.destroy)
+        self.b_close.grid(row=7, column=1) 
+
+        self.l_status = Label(top, text="")
+        self.l_status.grid(row=8, column=0)
+
+    def save_xfoil_settings(self):
+
+        subdict = {}
+        try:
+            subdict["iterations"] = int(self.t_iter.get())
+            subdict["Ncrit"] = int(self.t_ncrit.get())
+            subdict["timeout limit"] = float(self.t_timeout.get())
+            subdict["alpha_i"] = float(self.t_alpha_i.get())
+            subdict["alpha_f"] = float(self.t_alpha_f.get())
+            subdict["alpha_step"] = float(self.t_alpha_step.get())
+
+        except: 
+            self.l_status.configure(text="invalid value")
+            return 
+        
+        if subdict == self.settings: 
+            self.l_status.configure(text="settings not changed")
+            return 
+
+        self.l_status.configure(text="saved settings")
+        self.settings = subdict
+        self.full_settings["xfoil settings"] = self.settings
+        with open("tkinter/user_settings.json", "w") as file: 
+            json.dump(self.full_settings, file)
+
+
+class Avl_Settings: 
+
+    def __init__(self, root):
+
+        self.full_settings = json.load(open("tkinter/user_settings.json", "r"))
+        self.settings = self.full_settings["avl settings"]
+        top = Toplevel(root) 
+        top.geometry("360x200")
+        top.title("Default AVL Settings")
+
+        Label(top, text="# Chord Vortices:").grid(row=1, column=0)
+        self.t_nchord = Entry(top)
+        self.t_nchord.insert(END, str(self.settings["Nchord"]))
+        self.t_nchord.grid(row=1, column=1, columnspan=2) 
+
+        Label(top, text="# Halfspan Vortices:").grid(row=2, column=0)
+        self.t_nspan = Entry(top)
+        self.t_nspan.insert(END, str(self.settings["Nspan"]))
+        self.t_nspan.grid(row=2, column=1, columnspan=2) 
+
+        Label(top, text="Span Spacing:").grid(row=3, column=0)
+        self.t_sspace = Entry(top)
+        self.t_sspace.insert(END, str(self.settings["Sspace"]))
+        self.t_sspace.grid(row=3, column=1, columnspan=2) 
+
+        Label(top, text="Chord Spacing:").grid(row=4, column=0)
+        self.t_cspace = Entry(top)
+        self.t_cspace.insert(END, str(self.settings["Cspace"]))
+        self.t_cspace.grid(row=4, column=1, columnspan=2) 
+
+        Label(top, text="Initial AoA (deg):").grid(row=5, column=0)
+        self.t_alpha_i = Entry(top)
+        self.t_alpha_i.insert(END, str(self.settings["alpha_i"]))
+        self.t_alpha_i.grid(row=5, column=1, columnspan=2) 
+
+        Label(top, text="Final AoA (deg):").grid(row=6, column=0)
+        self.t_alpha_f = Entry(top)
+        self.t_alpha_f.insert(END, str(self.settings["alpha_f"]))
+        self.t_alpha_f.grid(row=6, column=1, columnspan=2) 
+
+        Label(top, text="AoA Step (deg):").grid(row=7, column=0)
+        self.t_alpha_step = Entry(top)
+        self.t_alpha_step.insert(END, str(self.settings["alpha_step"]))
+        self.t_alpha_step.grid(row=7, column=1, columnspan=2) 
+
+        self.b_save = Button(master=top, text="save",command=self.save_xfoil_settings)
+        self.b_save.grid(row=8, column=0)
+        self.b_close = Button(master=top, text="close", command=top.destroy)
+        self.b_close.grid(row=8, column=1) 
+
+        self.l_status = Label(top, text="")
+        self.l_status.grid(row=9, column=0)
+
+    def save_xfoil_settings(self):
+
+        subdict = {}
+        try:
+            subdict["Nchord"] = int(self.t_nchord.get())
+            subdict["Nspan"] = int(self.t_nspan.get())
+            subdict["Sspace"] = int(self.t_sspace.get())
+            subdict["Cspace"] = int(self.t_cspace.get())
+            subdict["alpha_i"] = float(self.t_alpha_i.get())
+            subdict["alpha_f"] = float(self.t_alpha_f.get())
+            subdict["alpha_step"] = float(self.t_alpha_step.get())
+
+        except: 
+            self.l_status.configure(text="invalid value")
+            return
+
+        if subdict["Sspace"] not in [-3,-2,-1,0,1,2,3]:
+            self.l_status.configure(text="invalid span spacing")
+            return 
+
+        if subdict["Cspace"] not in [-3,-2,-1,0,1,2,3]:
+            self.l_status.configure(text="invalid chord spacing")
+            return 
+        
+        if subdict == self.settings: 
+            self.l_status.configure(text="settings not changed")
+            return 
+
+        self.l_status.configure(text="saved settings")
+        self.settings = subdict
+        self.full_settings["avl settings"] = self.settings
+        with open("tkinter/user_settings.json", "w") as file: 
+            json.dump(self.full_settings, file)
+
 
 if __name__ == "__main__":
     

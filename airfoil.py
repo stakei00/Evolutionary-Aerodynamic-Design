@@ -7,7 +7,7 @@ import os
 class Airfoil:
 
     def __init__(self, m:float, p:float, t:float, Re:int, aseq:list=[-24,24,1],\
-                 n_iter:int=200, ncrit:int=9, search_airfoils=False) -> None:
+                 n_iter:int=200, ncrit:int=9, t_timeout=12, search_airfoils=True) -> None:
         """
         Initializes airfoil object
         Inputs:
@@ -46,9 +46,9 @@ class Airfoil:
 
         #if self not found in the history, run XFOIL to get attributes
         xfoil_data_neg = self.run_XFOIL_aseq(0, aseq[0], aseq[2], self.Re,\
-                            n_iter=n_iter, ncrit=ncrit) #negative angles of attack 
+                            n_iter=n_iter, ncrit=ncrit, t_timeout=t_timeout) #negative angles of attack 
         xfoil_data_pos = self.run_XFOIL_aseq(1, aseq[1], aseq[2], self.Re,\
-                            n_iter=n_iter, ncrit=ncrit) #positive angles of attack
+                            n_iter=n_iter, ncrit=ncrit, t_timeout=t_timeout) #positive angles of attack
 
         if np.size(xfoil_data_neg) == 7: 
             xfoil_data_neg = np.reshape(xfoil_data_neg, (1,7))
@@ -71,7 +71,7 @@ class Airfoil:
             self.pickle_airfoil()
         
     def run_XFOIL_aseq(self, alpha_i:float, alpha_f:float, alpha_step:float, \
-                  Re:int or float, n_iter:int, ncrit:int) -> None: 
+                  Re:int or float, n_iter:int, ncrit:int, t_timeout:float) -> None: 
         """
         Analysis of airfoil in XFOIL. Adds results to object attributes
         """
@@ -103,9 +103,7 @@ class Airfoil:
             f"ITER {n_iter}\n" +\
             f"ASeq {alpha_i} {alpha_f} {alpha_step}\n" +\
             "\n\n" +\
-            "quit\n" 
-                
-        timeout_seconds = 12 #process will terminate after this amount of time 
+            "quit\n"  
 
         with open(os.devnull, 'w') as null_file: 
             process = subprocess.Popen(["xfoil.exe"], stdin=subprocess.PIPE, stdout=null_file)      
@@ -113,7 +111,7 @@ class Airfoil:
             process.stdin.close()
 
         start_time = time.time()
-        while time.time() - start_time < timeout_seconds:
+        while time.time() - start_time < t_timeout:
             if process.poll() is not None: #check if the process has completed
                 break
             time.sleep(0.1) 
@@ -172,21 +170,16 @@ class Airfoil:
         alpha_interp_flip = np.flip(self.alpha_interp)
         dcl_dalpha_flip = np.flip(dcl_dalpha)
 
-        cl_min_ind = None
+        cl_min_ind = np.argmin(self.cl_interp)
         for i,a in enumerate(alpha_interp_flip[:-1]):
             if a > 0: continue 
             if dcl_dalpha_flip[i]*dcl_dalpha_flip[i+1] < 0: #if sign change 
                 cl_min_ind = len(self.alpha_interp)-1-i 
                 break
 
-        if cl_min_ind is None: 
-            cl_min_ind = 0
-            cl1, cd1 = None, None
-            self.min_lift_coefficient = None 
-        else:  
-            self.min_lift_coefficient = self.cl_interp[cl_min_ind]
-            self.alpha_min_lift_coeff =  self.alpha_interp[cl_min_ind]
-            cl1, cd1 = self.min_lift_coefficient, cd_interp_func(self.alpha_min_lift_coeff)
+        self.min_lift_coefficient = self.cl_interp[cl_min_ind]
+        self.alpha_min_lift_coeff =  self.alpha_interp[cl_min_ind]
+        cl1, cd1 = self.min_lift_coefficient, cd_interp_func(self.alpha_min_lift_coeff)
                 
         #trim alpha, cl, cd arrays 
         alpha_new, cl_new, cd_new, cm_new = [],[],[],[]

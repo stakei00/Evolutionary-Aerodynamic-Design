@@ -12,7 +12,8 @@ class Population:
     creates and manipulates population
     """
     def __init__(self, size:int, wing_parameters:dict, mutation_probs:list, 
-                 seed_wing:dict=None, multiproc:bool=True) -> None: 
+                avl_settings:dict, xfoil_settings:dict, seed_wing:dict=None, 
+                multiproc:int=1) -> None: 
         """
         initializes population of chromosomes
         Inputs: 
@@ -26,7 +27,12 @@ class Population:
         self.best_chrom_history = []
         self.p_gene_mut = mutation_probs[1]
         self.p_child_mut = mutation_probs[0]
+        self.pop_size = size
+        self.xfoil_settings = xfoil_settings
+        self.avl_settings = avl_settings
+        
         self.multiproc = multiproc
+        if multiproc > mp.cpu_count(): self.multiproc = mp.cpu_count()
         
         #separate constants from variables 
         self.variables = {} #variables and limits
@@ -44,17 +50,18 @@ class Population:
                 if isinstance(wing_parameters[key], list):
                     seed_chrom_header[key] = seed_wing[key] 
 
-        while len(self.chroms) < size:
+        while len(self.chroms) < self.pop_size:
             
-            if self.multiproc: 
+            if self.multiproc > 1: 
                 num_to_gen = size - len(self.chroms)
-                if math.ceil(mp.cpu_count()/2) < num_to_gen:
-                    num_to_gen = math.ceil(mp.cpu_count()/2)
+                if self.multiproc < num_to_gen:
+                    num_to_gen = self.multiproc
 
                 if seed_wing is not None: 
                     headers = [seed_chrom_header for _ in range(num_to_gen)]
                 else: 
-                    headers = [self.create_header(mutate=False) for _ in range(num_to_gen)]
+                    headers = [self.create_header(mutate=False) \
+                               for _ in range(num_to_gen)]
 
                 pool = mp.Pool(processes=num_to_gen)
                 chroms = pool.map(self.generate_chromosome, headers)
@@ -130,20 +137,33 @@ class Population:
         """
         multiprocessing target function for creating new chromosomes
         """
+
+        #extract from settings 
+        aseq = [self.xfoil_settings["alpha_i"],self.xfoil_settings["alpha_f"],
+                self.xfoil_settings["alpha_step"]]
+        n_iter = self.xfoil_settings["iterations"]
+        ncrit = self.xfoil_settings["Ncrit"]
+        t_timeout = self.xfoil_settings["timeout limit"]
         
         try:
-            root, tip, taper, AR, sweep, twist, re_c = self.extract_inputs(child_chrom_header)
+            root, tip, taper, AR, sweep, twist, re_c = \
+                self.extract_inputs(child_chrom_header)
             root_chord = 1
             Re_root = round(re_c*root_chord, -5)
-            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root)
-            if not hasattr(airfoil_root, "alpha"): return None
+            airfoil_root = airfoil.Airfoil(root[0], root[1], root[2], Re_root, 
+                                           aseq=aseq, n_iter=n_iter, ncrit=ncrit, 
+                                           t_timeout=t_timeout)
+            if not hasattr(airfoil_root, "alpha_raw"): return None
 
             tip_chord = taper*root_chord
             Re_tip = round(re_c*tip_chord, -5)
-            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip)
-            if not hasattr(airfoil_tip, "alpha"): return None
+            airfoil_tip = airfoil.Airfoil(tip[0], tip[1], tip[2], Re_tip, 
+                                          aseq=aseq, n_iter=n_iter, ncrit=ncrit, 
+                                          t_timeout=t_timeout)
+            if not hasattr(airfoil_tip, "alpha_raw"): return None
 
-            new_chrom = Chromosome(airfoil_root, airfoil_tip, taper, AR, sweep, twist)
+            new_chrom = Chromosome(airfoil_root, airfoil_tip, taper, AR, sweep, 
+                                   twist, self.avl_settings)
             new_chrom.chrom_header = child_chrom_header
             return new_chrom
         
@@ -171,10 +191,10 @@ class Population:
         new_chroms = []
         while len(new_chroms) < k: 
             
-            if self.multiproc: 
+            if self.multiproc > 1: 
                 num_to_gen = k - len(new_chroms)
-                if math.ceil(mp.cpu_count()/2) < num_to_gen:
-                    num_to_gen = math.ceil(mp.cpu_count()/2)
+                if self.multiproc < num_to_gen:
+                    num_to_gen = self.multiproc
 
                 headers = []    
                 for _ in range(num_to_gen):
@@ -214,17 +234,18 @@ class Population:
 
         self.best_chrom_fitness.append(self.best_chrom.fitness) 
 
+
 class Chromosome(wing.Wing):
     """
     creates a single chromosome 
     """
     def __init__(self, airfoil_root, airfoil_tip, taper_ratio, \
-                         aspect_ratio, sweep_deg, twist_deg) -> None: 
+                         aspect_ratio, sweep_deg, twist_deg, avl_settings) -> None: 
         """
         creates individual wing
         """
         super().__init__(airfoil_root, airfoil_tip, taper_ratio, \
-                         aspect_ratio, sweep_deg, twist_deg)
+                         aspect_ratio, sweep_deg, twist_deg, avl_settings)
 
     def evaluate_fitness(self, fitness_func) -> None: 
         """
@@ -259,7 +280,7 @@ def optimize(wing_parameters:dict, study_parameters:dict, fitness_function,\
     #create population 
     population = Population(size=popSize, wing_parameters=wing_parameters,\
                             mutation_probs=[p_child_mut, p_gene_mut],\
-                                seed_wing=seed_wing, multiproc=multiproc)  
+                                seed_wing=seed_wing, multiproc=6)  
     
     #evaluate fitness of initial population 
     [chrom.evaluate_fitness(fitness_function) for chrom in population.chroms]
