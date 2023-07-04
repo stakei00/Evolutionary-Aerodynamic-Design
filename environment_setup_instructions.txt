@@ -21,7 +21,7 @@ also only tested this with Windows 64-bit.
     using the "cd" command. Make sure the correct environment is activated. 
 
 5.  run the setup.ps1 by entering 
-    powershell.exe -ExecutionPolicy Bypacodess -File setup.ps1
+    powershell.exe -ExecutionPolicy Bypass -File setup.ps1
     wait for the process to finish. avlpy should now be in your packages/modules list 
 
 5.  The file avlInput.py located at ...\OpenVSP-3.33.1-win64\python\AvlPy\avlpy
