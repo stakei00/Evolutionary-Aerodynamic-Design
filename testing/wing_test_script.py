@@ -8,25 +8,26 @@ purpose of this script is to create a wing using two airfoils and analyze using
 XFOIL and AVL
 """
 
-afoil_root = af.Airfoil(m=0.04, p=0.4, t=0.12, Re=6e5, search_airfoils=False)
-afoil_tip = af.Airfoil(m=0.02, p=0.4, t=0.12, Re=6e5, search_airfoils=False)
+avl_settings = {
+        "Nchord": 12, 
+        "Nspan": 20, 
+        "Sspace": 1, 
+        "Cspace": 1, 
+        "alpha_i": -10.0, 
+        "alpha_f": 23.0, 
+        "alpha_step": 2.0
+    }
 
-"""
-import matplotlib.pyplot as plt 
-plt.figure()
-plt.plot(afoil_root.cd_interp, afoil_root.cl_interp, label="root")
-plt.scatter(afoil_root.drag_coefficient, afoil_root.lift_coefficient)
-plt.plot(afoil_tip.cd_interp, afoil_tip.cl_interp, label="tip")
-plt.scatter(afoil_tip.drag_coefficient, afoil_tip.lift_coefficient)
-plt.grid(), plt.legend()
-plt.show()
-"""
+afoil_root = af.Airfoil(m=0.04, p=0.4, t=0.12, Re=5e5, search_airfoils=False)
+afoil_tip = af.Airfoil(m=0.02, p=0.4, t=0.12, Re=5e5, search_airfoils=False)
+
 
 taper = 0.5
 AR = 12
 sweep_deg = 0
 twist_deg = 0
 
-test_wing = wing.Wing(afoil_root, afoil_tip, taper, AR, sweep_deg, twist_deg)
+test_wing = wing.Wing(afoil_root, afoil_tip, taper, AR, sweep_deg, twist_deg, 
+                      avl_settings=avl_settings)
 
 test_wing.plot_avl_xfoil_results() 

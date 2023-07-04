@@ -129,10 +129,14 @@ class Airfoil:
         except: 
             return None
         
-    def find_3pt_drag_polar(self) -> None: 
+    def find_3pt_drag_polar(self, salvage_polar:bool=True) -> None: 
         """
         Gets 3 points on CLCD drag polar for use with AVL
+        salvage_polar: if True, will return a partial drag polar list
         """
+
+        cl1, cl2, cl3 = None, None, None 
+        cd1, cd2, cd3 = None, None, None 
 
         #expand raw data points using interpolation
         self.alpha_interp = np.linspace(min(self.alpha_raw), max(self.alpha_raw), 200)
@@ -158,8 +162,9 @@ class Airfoil:
                 cl_max_ind = i
                 break 
                 
-        if cl_max_ind is None: 
-            cl3, cd3 = None, None
+        if cl_max_ind is None and salvage_polar: 
+            cl3_ind = np.argmax(self.cl_interp)
+            cl3, cd3 = self.cl_interp[cl3_ind], cd_interp_func(self.alpha_interp[cl3_ind])
             self.max_lift_coefficient = None
         else:     
             self.alpha_max_lift_coeff = self.alpha_interp[cl_max_ind]
@@ -170,16 +175,20 @@ class Airfoil:
         alpha_interp_flip = np.flip(self.alpha_interp)
         dcl_dalpha_flip = np.flip(dcl_dalpha)
 
-        cl_min_ind = np.argmin(self.cl_interp)
+        cl_min_ind = None
         for i,a in enumerate(alpha_interp_flip[:-1]):
             if a > 0: continue 
             if dcl_dalpha_flip[i]*dcl_dalpha_flip[i+1] < 0: #if sign change 
                 cl_min_ind = len(self.alpha_interp)-1-i 
                 break
-
-        self.min_lift_coefficient = self.cl_interp[cl_min_ind]
-        self.alpha_min_lift_coeff =  self.alpha_interp[cl_min_ind]
-        cl1, cd1 = self.min_lift_coefficient, cd_interp_func(self.alpha_min_lift_coeff)
+        
+        if cl_min_ind is None and salvage_polar: 
+            cl1_ind = np.argmin(self.cl_interp)
+            cl1, cd1 = self.cl_interp[cl1_ind], cd_interp_func(self.alpha_interp[cl1_ind])
+        else: 
+            self.min_lift_coefficient = self.cl_interp[cl_min_ind]
+            self.alpha_min_lift_coeff =  self.alpha_interp[cl_min_ind]
+            cl1, cd1 = self.min_lift_coefficient, cd_interp_func(self.alpha_min_lift_coeff)
                 
         #trim alpha, cl, cd arrays 
         alpha_new, cl_new, cd_new, cm_new = [],[],[],[]
@@ -208,6 +217,7 @@ class Airfoil:
         self.cd_interp = np.array([cd_interp_func(a) for a in self.alpha_interp])
         cd_min_ind = np.argmin(self.cd_interp)
 
+        #attempt to update points 1 and 3 so they lie on the parabolic region of polar 
         dcl_dalpha = dcl_dalpha[cl_min_ind:cl_max_ind+1]
         for i,a in enumerate(self.alpha_interp):
             if a < 0: continue

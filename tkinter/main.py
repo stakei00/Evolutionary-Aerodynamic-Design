@@ -143,7 +143,6 @@ class Gwing_Gui:
         Label(root, text="Reynolds/Chord:").grid(row=5, column=8)
         self.t_re_c = Entry(root).grid(row=5, column=9)
 
-
     def initialize_avl_tab(self):
         """
         """
